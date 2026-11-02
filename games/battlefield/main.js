@@ -19,6 +19,7 @@ let health = 100;
 let shieldEnergy = 0;
 let isShieldActive = false;
 let isGameOver = false;
+let isGameStarted = false;
 
 let stats = {
     kills: 0,
@@ -454,9 +455,10 @@ function initCharacterPreview() {
 }
 
 function createHUDOverlays() {
-    // Mini-map on bottom-left
+    // Mini-map on bottom-left (Hidden during lobby)
     const mapDiv = document.createElement('div');
     mapDiv.id = 'minimap-container';
+    mapDiv.className = 'hidden';
     mapDiv.style.position = 'fixed';
     mapDiv.style.left = '20px';
     mapDiv.style.bottom = '110px';
@@ -477,9 +479,10 @@ function createHUDOverlays() {
     document.body.appendChild(mapDiv);
     miniMapCtx = miniMapCanvas.getContext('2d');
 
-    // Combat Stats HUD
+    // Combat Stats HUD (Hidden during lobby)
     const hudInfo = document.createElement('div');
     hudInfo.id = 'combat-hud-stats';
+    hudInfo.className = 'hidden';
     hudInfo.style.position = 'fixed';
     hudInfo.style.left = '20px';
     hudInfo.style.top = '105px';
@@ -498,7 +501,7 @@ function createHUDOverlays() {
     `;
     document.body.appendChild(hudInfo);
 
-    // Game Over Overlay (Starts Hidden)
+    // Game Over Overlay (Hidden initially)
     const overlay = document.createElement('div');
     overlay.id = 'game-over-screen';
     overlay.className = 'hidden';
@@ -538,36 +541,39 @@ function setupLobbyUI() {
     const deployBtn = document.getElementById('start-deployment-btn');
     if (deployBtn) {
         deployBtn.onclick = () => {
+            isGameStarted = true;
             document.getElementById('lobby-menu').classList.add('hidden');
             document.getElementById('ui-overlay').classList.remove('hidden');
             document.getElementById('crosshair').classList.remove('hidden');
             document.getElementById('compass-container').classList.remove('hidden');
+
+            document.getElementById('minimap-container').classList.remove('hidden');
+            document.getElementById('combat-hud-stats').classList.remove('hidden');
 
             document.body.requestPointerLock();
             initVoiceChat();
         };
     }
 
-    // Cleanly structure story briefing and settings gear without overlapping elements
+    // Clean story card and settings gear button in lobby
     const lobbyMenu = document.getElementById('lobby-menu');
-    if (lobbyMenu && !document.getElementById('story-desc')) {
-        lobbyMenu.style.overflowY = 'auto';
-        lobbyMenu.style.paddingTop = '40px';
+    if (lobbyMenu && !document.getElementById('story-card')) {
+        const storyCard = document.createElement('div');
+        storyCard.id = 'story-card';
+        storyCard.style.margin = '15px 0';
+        storyCard.style.padding = '12px 16px';
+        storyCard.style.backgroundColor = 'rgba(15, 23, 42, 0.7)';
+        storyCard.style.borderLeft = '3px solid #9333ea';
+        storyCard.style.borderRadius = '6px';
+        storyCard.style.color = '#cbd5e1';
+        storyCard.style.fontSize = '0.85rem';
+        storyCard.style.lineHeight = '1.4';
+        storyCard.innerHTML = `<strong style="color:#f8fafc;">Tactical Briefing:</strong> Survive high-stakes combat across dynamic battlegrounds. Defeat opposing riflemen, collect ammunition drops, earn shield protection, and conquer the leaderboard!`;
 
-        const storyDiv = document.createElement('div');
-        storyDiv.id = 'story-desc';
-        storyDiv.style.padding = '10px 0';
-        storyDiv.style.color = '#94a3b8';
-        storyDiv.style.fontSize = '0.85rem';
-        storyDiv.style.lineHeight = '1.4';
-        storyDiv.style.maxWidth = '320px';
-        storyDiv.innerHTML = `<strong>Mission Briefing:</strong> Deploy into hostile sectors armed with assault rifles and tactical melee gear. Eliminate opposing combat squads in last-man-standing gunfights, collect ammo crates from fallen foes, and climb the military ranks!`;
-
-        // Insert right beneath the title heading nicely
         const titleEl = lobbyMenu.querySelector('h1') || lobbyMenu.children[0];
-        if (titleEl) titleEl.insertAdjacentElement('afterend', storyDiv);
+        if (titleEl) titleEl.insertAdjacentElement('afterend', storyCard);
 
-        // Settings Gear Button
+        // Gear Button
         const gearBtn = document.createElement('button');
         gearBtn.innerHTML = '⚙️ Settings';
         gearBtn.style.position = 'absolute';
@@ -676,7 +682,7 @@ function updateCompassAndElevation() {
 }
 
 function performAction() {
-    if (isGameOver) return;
+    if (isGameOver || !isGameStarted) return;
     stats.shotsFired++;
 
     if (currentWeapon === 'M16') {
@@ -742,7 +748,7 @@ function performAction() {
 }
 
 document.addEventListener('mousedown', (e) => {
-    if (document.pointerLockElement !== document.body || isGameOver) return;
+    if (document.pointerLockElement !== document.body || isGameOver || !isGameStarted) return;
     if (e.button === 0) performAction();
     else if (e.button === 2) {
         isScoped = !isScoped;
@@ -754,7 +760,7 @@ document.addEventListener('mousedown', (e) => {
 document.addEventListener('contextmenu', e => e.preventDefault());
 
 document.addEventListener('keydown', (e) => {
-    if (document.pointerLockElement !== document.body || isGameOver) return;
+    if (document.pointerLockElement !== document.body || isGameOver || !isGameStarted) return;
     if (e.code === 'KeyR') reloadWeapon();
     else if (e.code === 'KeyQ') activateShield();
     else if (e.key === '1') {
@@ -778,53 +784,54 @@ function animate() {
     const time = performance.now();
     const delta = (time - prevTime) / 1000;
 
-    if (!isGameOver && controls) controls.update(delta);
-    updateCompassAndElevation();
-    updateMiniMap();
+    // Paused completely while in Lobby Menu
+    if (isGameStarted && !isGameOver) {
+        if (controls) controls.update(delta);
+        updateCompassAndElevation();
+        updateMiniMap();
 
-    for (let debris of debrisObjects) {
-        debris.position.x += debris.userData.velocity.x * delta;
-        debris.position.z += debris.userData.velocity.y * delta;
-        debris.rotation.z += debris.userData.rotSpeed * delta;
-        if (debris.position.x > 180) debris.position.x = -180;
-        if (debris.position.z > 180) debris.position.z = -180;
-    }
-
-    for (let i = floatingTexts.length - 1; i >= 0; i--) {
-        const ft = floatingTexts[i];
-        ft.life -= delta;
-        ft.position.y += delta * 1.2;
-
-        const vector = ft.position.clone();
-        vector.project(camera);
-
-        const x = (vector.x * .5 + .5) * window.innerWidth;
-        const y = (-(vector.y * .5) + .5) * window.innerHeight;
-
-        ft.element.style.transform = `translate(-50%, -50%) translate(${x}px,${y}px)`;
-        ft.element.style.opacity = ft.life;
-
-        if (ft.life <= 0) {
-            ft.element.remove();
-            floatingTexts.splice(i, 1);
+        for (let debris of debrisObjects) {
+            debris.position.x += debris.userData.velocity.x * delta;
+            debris.position.z += debris.userData.velocity.y * delta;
+            debris.rotation.z += debris.userData.rotSpeed * delta;
+            if (debris.position.x > 180) debris.position.x = -180;
+            if (debris.position.z > 180) debris.position.z = -180;
         }
-    }
 
-    for (let i = lootCrates.length - 1; i >= 0; i--) {
-        const crate = lootCrates[i];
-        if (camera.position.distanceTo(crate.position) < 2.0) {
-            reserveAmmo += 30;
-            playSound('loot');
-            scene.remove(crate);
-            lootCrates.splice(i, 1);
-            const ammoDisplay = document.getElementById('ammo-val');
-            if (ammoDisplay && !isReloading) {
-                ammoDisplay.innerText = `${ammoInMag} / ${reserveAmmo} (M16)`;
+        for (let i = floatingTexts.length - 1; i >= 0; i--) {
+            const ft = floatingTexts[i];
+            ft.life -= delta;
+            ft.position.y += delta * 1.2;
+
+            const vector = ft.position.clone();
+            vector.project(camera);
+
+            const x = (vector.x * .5 + .5) * window.innerWidth;
+            const y = (-(vector.y * .5) + .5) * window.innerHeight;
+
+            ft.element.style.transform = `translate(-50%, -50%) translate(${x}px,${y}px)`;
+            ft.element.style.opacity = ft.life;
+
+            if (ft.life <= 0) {
+                ft.element.remove();
+                floatingTexts.splice(i, 1);
             }
         }
-    }
 
-    if (!isGameOver) {
+        for (let i = lootCrates.length - 1; i >= 0; i--) {
+            const crate = lootCrates[i];
+            if (camera.position.distanceTo(crate.position) < 2.0) {
+                reserveAmmo += 30;
+                playSound('loot');
+                scene.remove(crate);
+                lootCrates.splice(i, 1);
+                const ammoDisplay = document.getElementById('ammo-val');
+                if (ammoDisplay && !isReloading) {
+                    ammoDisplay.innerText = `${ammoInMag} / ${reserveAmmo} (M16)`;
+                }
+            }
+        }
+
         for (let i = 0; i < enemies.length; i++) {
             const enemy = enemies[i];
             const distToPlayer = enemy.position.distanceTo(camera.position);
