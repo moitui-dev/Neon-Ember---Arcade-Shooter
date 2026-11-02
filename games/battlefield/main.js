@@ -7,7 +7,7 @@ let controls;
 let isScoped = false;
 let gunGroup;
 
-let currentWeapon = 'M16';
+let currentWeapon = 'M16'; // Can be 'M16' or 'Bat'
 let selectedMap = 'city';
 let selectedMode = 'solo';
 let graphicsPreset = 'high';
@@ -36,6 +36,14 @@ function playSound(type) {
         gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
         osc.start();
         osc.stop(audioCtx.currentTime + 0.12);
+    } else if (type === 'swing') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(180, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(60, audioCtx.currentTime + 0.15);
+        gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.15);
     } else if (type === 'hit') {
         osc.type = 'square';
         osc.frequency.setValueAtTime(500, audioCtx.currentTime);
@@ -60,8 +68,8 @@ function initGame() {
     if (!container) return;
 
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0f172a);
-    scene.fog = new THREE.FogExp2(0x0f172a, 0.008);
+    scene.background = new THREE.Color(0x0a0e1a);
+    scene.fog = new THREE.FogExp2(0x0a0e1a, 0.007);
 
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     camera.position.set(0, 1.6, 10);
@@ -73,10 +81,10 @@ function initGame() {
     renderer.shadowMap.type = THREE.PCFShadowMap;
     container.appendChild(renderer.domElement);
 
-    ambientLight = new THREE.AmbientLight(0x38bdf8, 0.55);
+    ambientLight = new THREE.AmbientLight(0x38bdf8, 0.45);
     scene.add(ambientLight);
 
-    dirLight = new THREE.DirectionalLight(0x93c5fd, 1.2);
+    dirLight = new THREE.DirectionalLight(0x93c5fd, 1.0);
     dirLight.position.set(80, 120, -60);
     dirLight.castShadow = true;
     dirLight.shadow.mapSize.width = 1024;
@@ -84,11 +92,11 @@ function initGame() {
     scene.add(dirLight);
 
     initSkyAndMoon();
-    initFirstPersonWeapon();
+    updateWeaponMesh();
     buildEnvironment(selectedMap);
     controls = initFirstPersonControls(camera, environmentObjects);
 
-    for (let i = 0; i < 6; i++) spawnRealisticZombie();
+    for (let i = 0; i < 7; i++) spawnRealisticZombie();
 
     setupMenuUI();
     initCharacterPreview();
@@ -117,58 +125,76 @@ function initSkyAndMoon() {
     scene.add(new THREE.Points(starGeo, starMat));
 }
 
-function initFirstPersonWeapon() {
+function updateWeaponMesh() {
+    if (gunGroup) camera.remove(gunGroup);
     gunGroup = new THREE.Group();
-    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x1e1b2e, metalness: 0.8, roughness: 0.3 });
-    const receiver = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.12, 0.6), bodyMat);
-    receiver.position.set(0.2, -0.22, -0.5);
 
-    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.5), new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.9 }));
-    barrel.rotation.x = Math.PI / 2;
-    barrel.position.set(0.2, -0.21, -0.85);
+    if (currentWeapon === 'M16') {
+        const bodyMat = new THREE.MeshStandardMaterial({ color: 0x1e1b2e, metalness: 0.8, roughness: 0.3 });
+        const receiver = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.12, 0.6), bodyMat);
+        receiver.position.set(0.2, -0.22, -0.5);
 
-    const mag = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.2, 0.12), new THREE.MeshStandardMaterial({ color: 0x332244 }));
-    mag.position.set(0.2, -0.35, -0.45);
+        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.5), new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.9 }));
+        barrel.rotation.x = Math.PI / 2;
+        barrel.position.set(0.2, -0.21, -0.85);
 
-    gunGroup.add(receiver, barrel, mag);
+        const mag = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.2, 0.12), new THREE.MeshStandardMaterial({ color: 0x332244 }));
+        mag.position.set(0.2, -0.35, -0.45);
+
+        gunGroup.add(receiver, barrel, mag);
+    } else if (currentWeapon === 'Bat') {
+        const batMat = new THREE.MeshStandardMaterial({ color: 0x854d0e, roughness: 0.6 });
+        const batMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.025, 0.8, 12), batMat);
+        batMesh.rotation.x = Math.PI / 3;
+        batMesh.position.set(0.25, -0.25, -0.45);
+        gunGroup.add(batMesh);
+    }
+
     camera.add(gunGroup);
     scene.add(camera);
 }
 
 function spawnRealisticZombie() {
     const group = new THREE.Group();
-    const skinMat = new THREE.MeshStandardMaterial({ color: 0x5a6351, roughness: 0.7 });
-    const clothesMat = new THREE.MeshStandardMaterial({ color: 0x27272a });
+    const isFemale = Math.random() > 0.5;
 
-    const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.22, 0.75, 12), clothesMat);
+    const skinMat = new THREE.MeshStandardMaterial({ color: isFemale ? 0x657158 : 0x5a6351, roughness: 0.7 });
+    const clothesMat = new THREE.MeshStandardMaterial({ color: isFemale ? 0x472d42 : 0x27272a, roughness: 0.8 });
+
+    // Physique variations: Females have slimmer torsos and wider hips/shoulders proportion
+    const torsoWidth = isFemale ? 0.22 : 0.28;
+    const torsoHeight = isFemale ? 0.7 : 0.75;
+    const torso = new THREE.Mesh(new THREE.CylinderGeometry(torsoWidth + 0.04, torsoWidth, torsoHeight, 12), clothesMat);
     torso.position.y = 1.1;
 
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 16), skinMat);
-    head.position.y = 1.78;
+    const headGeo = isFemale ? new THREE.SphereGeometry(0.19, 16, 16) : new THREE.BoxGeometry(0.22, 0.26, 0.22);
+    const head = new THREE.Mesh(headGeo, skinMat);
+    head.position.y = 1.75;
 
+    const limbWidth = isFemale ? 0.055 : 0.07;
     const leftArmGroup = new THREE.Group();
-    const leftArm = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.06, 0.65, 8), clothesMat);
+    const leftArm = new THREE.Mesh(new THREE.CylinderGeometry(limbWidth, limbWidth - 0.01, 0.65, 8), clothesMat);
     leftArm.position.y = -0.3;
     leftArmGroup.add(leftArm);
-    leftArmGroup.position.set(-0.32, 1.38, 0);
+    leftArmGroup.position.set(-(torsoWidth + 0.08), 1.38, 0);
 
     const rightArmGroup = new THREE.Group();
-    const rightArm = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.06, 0.65, 8), clothesMat);
+    const rightArm = new THREE.Mesh(new THREE.CylinderGeometry(limbWidth, limbWidth - 0.01, 0.65, 8), clothesMat);
     rightArm.position.y = -0.3;
     rightArmGroup.add(rightArm);
-    rightArmGroup.position.set(0.32, 1.38, 0);
+    rightArmGroup.position.set(torsoWidth + 0.08, 1.38, 0);
 
     const leftLegGroup = new THREE.Group();
-    const leftLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.07, 0.7, 8), clothesMat);
+    const leftLeg = new THREE.Mesh(new THREE.CylinderGeometry(limbWidth + 0.015, limbWidth, 0.7, 8), clothesMat);
     leftLeg.position.y = -0.35;
     leftLegGroup.add(leftLeg);
-    leftLegGroup.position.set(-0.14, 0.7, 0);
+    leftLegGroup.position.set(-0.12, 0.7, 0);
 
     const rightLegGroup = new THREE.Group();
-    const rightLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.07, 0.7, 8), clothesMat);
+    const rightLeg = new THREE.Mesh(new THREE.CylinderGeometry(limbWidth + 0.015, limbWidth, 0.7, 8), clothesMat);
     rightLeg.position.y = -0.35;
     rightLegGroup.add(rightLeg);
-    rightLegGroup.position.set(0.14, 0.7, 0);
+    rightLegGroup.position.set(0.12, 0.7, 0);
 
     group.add(torso, head, leftArmGroup, rightArmGroup, leftLegGroup, rightLegGroup);
 
@@ -177,8 +203,8 @@ function spawnRealisticZombie() {
     group.position.set(Math.cos(angle) * dist, 0, Math.sin(angle) * dist);
 
     group.userData = {
-        health: 100,
-        speed: 2.1,
+        health: isFemale ? 80 : 120, // Females are faster/agile, males are tougher
+        speed: isFemale ? 2.4 : 1.9,
         walkCycle: Math.random() * Math.PI * 2,
         torso, leftArmGroup, rightArmGroup, leftLegGroup, rightLegGroup
     };
@@ -191,38 +217,117 @@ function buildEnvironment(mapType) {
     environmentObjects.forEach(obj => scene.remove(obj));
     environmentObjects.length = 0;
 
-    const floorGeo = new THREE.PlaneGeometry(320, 320);
+    // Ground Floor / Tarmac
+    const floorGeo = new THREE.PlaneGeometry(360, 360);
     const floorMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.9 });
     const floor = new THREE.Mesh(floorGeo, floorMat);
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
     scene.add(floor);
 
+    // Tarmac roads & center strip markings
     const tarmacMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.8 });
+    const stripeMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 }); // Yellow center stripe
+
     for (let pos of [-50, 0, 50]) {
-        const roadNS = new THREE.Mesh(new THREE.PlaneGeometry(12, 320), tarmacMat);
+        const roadNS = new THREE.Mesh(new THREE.PlaneGeometry(14, 360), tarmacMat);
         roadNS.rotation.x = -Math.PI / 2;
         roadNS.position.set(pos, 0.01, 0);
         scene.add(roadNS);
+
+        // Center line
+        const stripe = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 360), stripeMat);
+        stripe.rotation.x = -Math.PI / 2;
+        stripe.position.set(pos, 0.02, 0);
+        scene.add(stripe);
     }
 
+    // Buildings with Windows and Doors
     const bWallMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.7 });
-    for (let x = -100; x <= 100; x += 40) {
-        for (let z = -100; z <= 100; z += 40) {
-            if (Math.abs(x) < 15 || Math.abs(z) < 15) continue;
+    const windowMat = new THREE.MeshStandardMaterial({ color: 0xfef08a, emissive: 0xca8a04, emissiveIntensity: 0.4 });
+    const doorMat = new THREE.MeshStandardMaterial({ color: 0x451a03 });
+
+    for (let x = -120; x <= 120; x += 40) {
+        for (let z = -120; z <= 120; z += 40) {
+            if (Math.abs(x) < 18 || Math.abs(z) < 18) continue;
 
             const bGroup = new THREE.Group();
-            const mainBox = new THREE.Mesh(new THREE.BoxGeometry(14, 14, 14), bWallMat);
-            mainBox.position.y = 7;
+            const height = 16 + Math.random() * 8;
+            const mainBox = new THREE.Mesh(new THREE.BoxGeometry(14, height, 14), bWallMat);
+            mainBox.position.y = height / 2;
             mainBox.castShadow = true;
             mainBox.receiveShadow = true;
             bGroup.add(mainBox);
+
+            // Add Ground Door
+            const door = new THREE.Mesh(new THREE.BoxGeometry(2.2, 3.5, 0.4), doorMat);
+            door.position.set(0, 1.75, 7.05);
+            bGroup.add(door);
+
+            // Add Windows on faces
+            for (let wy = 5; wy < height - 2; wy += 4) {
+                for (let wx = -3.5; wx <= 3.5; wx += 3.5) {
+                    const winFront = new THREE.Mesh(new THREE.BoxGeometry(1.5, 2, 0.2), windowMat);
+                    winFront.position.set(wx, wy, 7.05);
+                    bGroup.add(winFront);
+
+                    const winBack = new THREE.Mesh(new THREE.BoxGeometry(1.5, 2, 0.2), windowMat);
+                    winBack.position.set(wx, wy, -7.05);
+                    bGroup.add(winBack);
+                }
+            }
 
             bGroup.position.set(x, 0, z);
             scene.add(bGroup);
             environmentObjects.push(bGroup);
         }
     }
+
+    // Overhead Bridges connecting buildings
+    const bridgeMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.6 });
+    const bridge1 = new THREE.Mesh(new THREE.BoxGeometry(40, 1.5, 6), bridgeMat);
+    bridge1.position.set(-25, 12, 0);
+    bridge1.castShadow = true;
+    scene.add(bridge1);
+    environmentObjects.push(bridge1);
+
+    const bridge2 = new THREE.Mesh(new THREE.BoxGeometry(6, 1.5, 40), bridgeMat);
+    bridge2.position.set(0, 15, -25);
+    bridge2.castShadow = true;
+    scene.add(bridge2);
+    environmentObjects.push(bridge2);
+
+    // Street Lights with Glowing Bulbs and Poles
+    const poleMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.8 });
+    const bulbMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+
+    [-60, 0, 60].forEach(lx => {
+        [-60, 0, 60].forEach(lz => {
+            if (Math.abs(lx) < 20 && Math.abs(lz) < 20) return;
+            const poleGroup = new THREE.Group();
+
+            const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 10), poleMat);
+            pole.position.y = 5;
+            pole.castShadow = true;
+            poleGroup.add(pole);
+
+            const arm = new THREE.Mesh(new THREE.BoxGeometry(2, 0.2, 0.2), poleMat);
+            arm.position.set(1, 9.9, 0);
+            poleGroup.add(arm);
+
+            const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.4, 8, 8), bulbMat);
+            bulb.position.set(1.8, 9.7, 0);
+            poleGroup.add(bulb);
+
+            const pointLight = new THREE.PointLight(0xfef08a, 1.2, 25);
+            pointLight.position.set(1.8, 9.4, 0);
+            poleGroup.add(pointLight);
+
+            poleGroup.position.set(lx, 0, lz);
+            scene.add(poleGroup);
+            environmentObjects.push(poleGroup);
+        });
+    });
 }
 
 function initCharacterPreview() {
@@ -312,12 +417,15 @@ function updateCompassAndElevation() {
     if (elevationElem) elevationElem.innerText = `PITCH: ${Math.floor(pitchDeg)}°`;
 }
 
-function shootWeapon() {
-    if (ammoCount <= 0) return;
-    ammoCount--;
-    document.getElementById('ammo-val').innerText = `${ammoCount} / 90 (${currentWeapon})`;
-
-    playSound('shot');
+function performAction() {
+    if (currentWeapon === 'M16') {
+        if (ammoCount <= 0) return;
+        ammoCount--;
+        document.getElementById('ammo-val').innerText = `${ammoCount} / 90 (M16)`;
+        playSound('shot');
+    } else {
+        playSound('swing');
+    }
 
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
@@ -330,8 +438,12 @@ function shootWeapon() {
         }
 
         if (hitObj.userData && hitObj.userData.health) {
+            // Melee range check for Bat
+            const dist = camera.position.distanceTo(hitObj.position);
+            if (currentWeapon === 'Bat' && dist > 3.5) return;
+
             playSound('hit');
-            hitObj.userData.health -= 40;
+            hitObj.userData.health -= (currentWeapon === 'Bat' ? 60 : 40);
 
             if (hitObj.userData.health <= 0) {
                 scene.remove(hitObj);
@@ -343,17 +455,33 @@ function shootWeapon() {
     }
 }
 
+// Keybindings for weapon swapping (Press '1' for M16, '2' for Bat)
+document.addEventListener('keydown', (e) => {
+    if (document.pointerLockElement !== document.body) return;
+    if (e.key === '1') {
+        currentWeapon = 'M16';
+        updateWeaponMesh();
+        document.getElementById('ammo-val').innerText = `${ammoCount} / 90 (M16)`;
+    } else if (e.key === '2') {
+        currentWeapon = 'Bat';
+        updateWeaponMesh();
+        document.getElementById('ammo-val').innerText = `Melee Ready (Bat)`;
+    }
+});
+
 document.addEventListener('mousedown', (e) => {
     if (document.pointerLockElement !== document.body) return;
     if (e.button === 2) {
-        isScoped = true;
-        camera.fov = 25;
-        camera.updateProjectionMatrix();
-        document.getElementById('scope-overlay')?.classList.remove('hidden');
-        document.getElementById('crosshair')?.classList.add('hidden');
-        if (gunGroup) gunGroup.visible = false;
+        if (currentWeapon === 'M16') {
+            isScoped = true;
+            camera.fov = 25;
+            camera.updateProjectionMatrix();
+            document.getElementById('scope-overlay')?.classList.remove('hidden');
+            document.getElementById('crosshair')?.classList.add('hidden');
+            if (gunGroup) gunGroup.visible = false;
+        }
     } else if (e.button === 0) {
-        shootWeapon();
+        performAction();
     }
 });
 
@@ -393,7 +521,7 @@ function animate() {
             enemy.userData.leftArmGroup.rotation.x = Math.sin(cycle) * 0.5;
             enemy.userData.rightArmGroup.rotation.x = -Math.sin(cycle) * 0.5;
             enemy.userData.leftLegGroup.rotation.x = -Math.sin(cycle) * 0.5;
-            enemy.userData.rightLegGroup.rotation.x = Math.sin(cycle) * 0.5;
+            enemy.userData.rightLegGroup.rotation.x = -Math.sin(cycle) * 0.5;
         }
 
         enemy.lookAt(camera.position.x, 0, camera.position.z);
