@@ -5,6 +5,7 @@ import { initVoiceChat } from './voice.js';
 let scene, camera, renderer;
 let controls;
 let isScoped = false;
+let gunGroup;
 
 // Game State
 let currentWeapon = 'M16';
@@ -19,11 +20,47 @@ const environmentObjects = [];
 let dirLight, ambientLight;
 let prevTime = performance.now();
 
+// Web Audio API Sound Synthesizer (No external files needed)
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function playSound(type) {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    if (type === 'shot') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(250, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.12);
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.12);
+    } else if (type === 'hit') {
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.08);
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.08);
+    } else if (type === 'damage') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(120, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.2);
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.2);
+    }
+}
+
 function initGame() {
     const container = document.getElementById('game-canvas-container');
     if (!container) return;
 
-    // 1. Scene & Camera Setup
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x120d16);
     scene.fog = new THREE.FogExp2(0x120d16, 0.015);
@@ -37,7 +74,6 @@ function initGame() {
     renderer.shadowMap.enabled = true;
     container.appendChild(renderer.domElement);
 
-    // Lighting
     ambientLight = new THREE.AmbientLight(0xd8b4fe, 0.6);
     scene.add(ambientLight);
 
@@ -58,7 +94,9 @@ function initGame() {
     gridHelper.position.y = 0.01;
     scene.add(gridHelper);
 
-    // Initialize Environment & Controls
+    // Add First-Person Weapon Model & Hands to Camera
+    initFirstPersonWeapon();
+
     buildEnvironment(selectedMap);
     controls = initFirstPersonControls(camera, environmentObjects);
 
@@ -67,6 +105,29 @@ function initGame() {
     setupMenuUI();
     initCharacterPreview();
     animate();
+}
+
+// First-Person Gun & Hands Attached to Camera
+function initFirstPersonWeapon() {
+    gunGroup = new THREE.Group();
+
+    // Gun body
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x1e1b2e, metalness: 0.8, roughness: 0.3 });
+    const receiver = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.12, 0.6), bodyMat);
+    receiver.position.set(0.2, -0.22, -0.5);
+
+    // Barrel
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.5), new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.9 }));
+    barrel.rotation.x = Math.PI / 2;
+    barrel.position.set(0.2, -0.21, -0.85);
+
+    // Magazine
+    const mag = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.2, 0.12), new THREE.MeshStandardMaterial({ color: 0x332244 }));
+    mag.position.set(0.2, -0.35, -0.45);
+
+    gunGroup.add(receiver, barrel, mag);
+    camera.add(gunGroup);
+    scene.add(camera);
 }
 
 // Menu Preview Render
@@ -104,7 +165,6 @@ function initCharacterPreview() {
     animPrev();
 }
 
-// UI Setup & Deployment
 function setupMenuUI() {
     document.querySelectorAll('#map-selector .option-btn').forEach(btn => {
         btn.onclick = (e) => {
@@ -147,14 +207,12 @@ function setupMenuUI() {
                 renderer.setPixelRatio(window.devicePixelRatio);
             }
 
-            // Request Pointer Lock securely on deployment click
             document.body.requestPointerLock();
             initVoiceChat();
         };
     }
 }
 
-// Map Environment Builder with Collisions
 function buildEnvironment(mapType) {
     environmentObjects.forEach(obj => scene.remove(obj));
     environmentObjects.length = 0;
@@ -186,12 +244,11 @@ function buildEnvironment(mapType) {
 
             group.position.set((Math.random() - 0.5) * 120, 0, (Math.random() - 0.5) * 120);
             scene.add(group);
-            environmentObjects.push(group); // Adds tree to collision bounds!
+            environmentObjects.push(group);
         }
     }
 }
 
-// Enemy AI
 function spawnEnemy() {
     const group = new THREE.Group();
     const body = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 1.6), new THREE.MeshStandardMaterial({ color: 0x7e22ce }));
@@ -201,7 +258,7 @@ function spawnEnemy() {
     group.add(body, head);
 
     const angle = Math.random() * Math.PI * 2;
-    const dist = 20 + Math.random() * 30;
+    const dist = 25 + Math.random() * 25;
     group.position.set(Math.cos(angle) * dist, 0, Math.sin(angle) * dist);
     group.userData = { health: 100, speed: 2.0 };
 
@@ -209,11 +266,25 @@ function spawnEnemy() {
     enemies.push(group);
 }
 
-// Weapon Firing & Scope Mechanics
+// Shooting with Sound, Muzzle Flash, and Visual Hit Flash
 function shootWeapon() {
     if (ammoCount <= 0) return;
     ammoCount--;
     document.getElementById('ammo-val').innerText = `${ammoCount} / 90 (${currentWeapon})`;
+
+    playSound('shot');
+
+    // Gun recoil animation kickback
+    if (gunGroup) {
+        gunGroup.position.z += 0.08;
+        setTimeout(() => { gunGroup.position.z -= 0.08; }, 60);
+    }
+
+    // Muzzle Flash Light
+    const flash = new THREE.PointLight(0xa855f7, 5, 6);
+    flash.position.set(0.2, -0.2, -0.9);
+    camera.add(flash);
+    setTimeout(() => camera.remove(flash), 50);
 
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
@@ -224,8 +295,20 @@ function shootWeapon() {
         while (hitObj.parent && !hitObj.userData.health && hitObj.parent !== scene) {
             hitObj = hitObj.parent;
         }
+
         if (hitObj.userData && hitObj.userData.health) {
+            playSound('hit');
             hitObj.userData.health -= 40;
+
+            // Visual Hit Flash (turn enemy bright red momentarily)
+            hitObj.traverse((child) => {
+                if (child.material) {
+                    const origColor = child.material.color.getHex();
+                    child.material.color.setHex(0xef4444);
+                    setTimeout(() => child.material.color.setHex(origColor), 100);
+                }
+            });
+
             if (hitObj.userData.health <= 0) {
                 scene.remove(hitObj);
                 const idx = enemies.indexOf(hitObj);
@@ -236,31 +319,31 @@ function shootWeapon() {
     }
 }
 
-// Mouse Controls for Firing and Scope (ADS)
 document.addEventListener('mousedown', (e) => {
     if (document.pointerLockElement !== document.body) return;
-    if (e.button === 2) { // Right Click Scope Zoom
+    if (e.button === 2) { // Right Click Scope
         isScoped = true;
         camera.fov = 25;
         camera.updateProjectionMatrix();
         document.getElementById('scope-overlay')?.classList.remove('hidden');
         document.getElementById('crosshair')?.classList.add('hidden');
+        if (gunGroup) gunGroup.visible = false; // Hide gun when scoped
     } else if (e.button === 0) { // Left Click Shoot
         shootWeapon();
     }
 });
 
 document.addEventListener('mouseup', (e) => {
-    if (e.button === 2) {
+    if (e.button === 2) { // Release Scope
         isScoped = false;
         camera.fov = 75;
         camera.updateProjectionMatrix();
         document.getElementById('scope-overlay')?.classList.add('hidden');
         document.getElementById('crosshair')?.classList.remove('hidden');
+        if (gunGroup) gunGroup.visible = true;
     }
 });
 
-// Main Loop
 function animate() {
     requestAnimationFrame(animate);
 
@@ -269,16 +352,23 @@ function animate() {
 
     if (controls) controls.update(delta);
 
+    // Enemy Pursuit with separation/pushback
     enemies.forEach((enemy) => {
-        const dir = new THREE.Vector3().subVectors(camera.position, enemy.position);
-        dir.y = 0;
-        dir.normalize();
-        enemy.position.addScaledVector(dir, enemy.userData.speed * delta);
+        const dist = enemy.position.distanceTo(camera.position);
+
+        if (dist > 1.4) { // Stop walking directly into player center
+            const dir = new THREE.Vector3().subVectors(camera.position, enemy.position);
+            dir.y = 0;
+            dir.normalize();
+            enemy.position.addScaledVector(dir, enemy.userData.speed * delta);
+        }
+
         enemy.lookAt(camera.position.x, 0, camera.position.z);
 
-        if (enemy.position.distanceTo(camera.position) < 1.2) {
-            health = Math.max(0, health - 0.2);
+        if (dist < 1.6) {
+            health = Math.max(0, health - 0.3);
             document.getElementById('health-val').innerText = Math.floor(health);
+            playSound('damage');
         }
     });
 

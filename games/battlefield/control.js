@@ -9,7 +9,6 @@ export function initFirstPersonControls(camera, environmentObjects) {
     const velocity = new THREE.Vector3();
     const direction = new THREE.Vector3();
 
-    // Mouse Look via Pointer Lock API
     document.addEventListener('mousemove', (event) => {
         if (document.pointerLockElement !== document.body) return;
 
@@ -21,7 +20,6 @@ export function initFirstPersonControls(camera, environmentObjects) {
         camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x));
     });
 
-    // Keyboard Listeners with immediate stop on keyup
     document.addEventListener('keydown', (e) => {
         switch (e.code) {
             case 'KeyW': moveForward = true; break;
@@ -41,7 +39,6 @@ export function initFirstPersonControls(camera, environmentObjects) {
     });
 
     function update(delta) {
-        // Friction / Deceleration to prevent infinite sliding
         velocity.x -= velocity.x * 12.0 * delta;
         velocity.z -= velocity.z * 12.0 * delta;
 
@@ -49,28 +46,41 @@ export function initFirstPersonControls(camera, environmentObjects) {
         direction.x = Number(moveRight) - Number(moveLeft);
         direction.normalize();
 
-        if (moveForward || moveBackward) velocity.z -= direction.z * 40.0 * delta;
-        if (moveLeft || moveRight) velocity.x -= direction.x * 40.0 * delta;
+        if (moveForward || moveBackward) velocity.z -= direction.z * 35.0 * delta;
+        if (moveLeft || moveRight) velocity.x -= direction.x * 35.0 * delta;
 
-        const oldPosition = camera.position.clone();
+        // Separate X and Z movement for smooth sliding against walls (prevents getting stuck)
+        const moveX = -velocity.x * delta;
+        const moveZ = velocity.z * delta;
 
-        camera.translateX(-velocity.x * delta);
-        camera.translateZ(velocity.z * delta);
-        camera.position.y = 1.6; // Lock eye-level height
+        // Test X movement
+        camera.translateX(moveX);
+        camera.position.y = 1.6;
+        if (checkCollision(camera, environmentObjects)) {
+            camera.translateX(-moveX); // Revert X if colliding
+        }
 
-        // Basic Bounding Box Collision Detection against environment objects
+        // Test Z movement
+        camera.translateZ(moveZ);
+        camera.position.y = 1.6;
+        if (checkCollision(camera, environmentObjects)) {
+            camera.translateZ(-moveZ); // Revert Z if colliding
+        }
+    }
+
+    function checkCollision(cam, objects) {
         const playerBox = new THREE.Box3().setFromCenterAndSize(
-            new THREE.Vector3(camera.position.x, 1.6, camera.position.z),
-            new THREE.Vector3(0.8, 1.8, 0.8)
+            new THREE.Vector3(cam.position.x, 1.6, cam.position.z),
+            new THREE.Vector3(0.6, 1.8, 0.6)
         );
 
-        for (let obj of environmentObjects) {
+        for (let obj of objects) {
             const objBox = new THREE.Box3().setFromObject(obj);
             if (playerBox.intersectsBox(objBox)) {
-                camera.position.copy(oldPosition); // Revert position on collision
-                break;
+                return true;
             }
         }
+        return false;
     }
 
     return { update };
