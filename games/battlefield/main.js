@@ -15,11 +15,14 @@ let ammoInMag = 30;
 let reserveAmmo = 90;
 let isReloading = false;
 let health = 100;
+let isGameOver = false;
 
 const enemies = [];
 const lootCrates = [];
+const floatingTexts = [];
+const debrisObjects = [];
 const environmentObjects = [];
-let dirLight, ambientLight;
+let dirLight, ambientLight, cloudsGroup;
 let prevTime = performance.now();
 
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -79,8 +82,8 @@ function initGame() {
     if (!container) return;
 
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0a0e1a);
-    scene.fog = new THREE.FogExp2(0x0a0e1a, 0.007);
+    scene.background = new THREE.Color(0x38bdf8); // Bright day sky
+    scene.fog = new THREE.FogExp2(0x38bdf8, 0.003);
 
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     camera.position.set(0, 1.6, 10);
@@ -91,15 +94,16 @@ function initGame() {
     renderer.shadowMap.enabled = true;
     container.appendChild(renderer.domElement);
 
-    ambientLight = new THREE.AmbientLight(0x38bdf8, 0.45);
+    ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
     scene.add(ambientLight);
 
-    dirLight = new THREE.DirectionalLight(0x93c5fd, 1.0);
-    dirLight.position.set(80, 120, -60);
+    dirLight = new THREE.DirectionalLight(0xfffbeb, 1.2);
+    dirLight.position.set(100, 150, 50);
     dirLight.castShadow = true;
     scene.add(dirLight);
 
-    initSkyAndMoon();
+    initDaySkyAndSun();
+    initDebris();
     updateWeaponMesh();
     buildEnvironment();
     controls = initFirstPersonControls(camera, environmentObjects);
@@ -108,15 +112,54 @@ function initGame() {
 
     setupMenuUI();
     initCharacterPreview();
+    createGameOverOverlay();
     animate();
 }
 
-function initSkyAndMoon() {
-    const moonGeo = new THREE.SphereGeometry(6, 16, 16);
-    const moonMat = new THREE.MeshBasicMaterial({ color: 0xffedd5 });
-    const moon = new THREE.Mesh(moonGeo, moonMat);
-    moon.position.set(80, 120, -60);
-    scene.add(moon);
+function initDaySkyAndSun() {
+    // Bright Sun
+    const sunGeo = new THREE.SphereGeometry(10, 24, 24);
+    const sunMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+    const sun = new THREE.Mesh(sunGeo, sunMat);
+    sun.position.set(100, 150, 50);
+    scene.add(sun);
+
+    // Moving Clouds
+    cloudsGroup = new THREE.Group();
+    const cloudMat = new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, roughness: 1.0 });
+    for (let i = 0; i < 20; i++) {
+        const cloudPiece = new THREE.Mesh(new THREE.BoxGeometry(15 + Math.random() * 20, 3, 8 + Math.random() * 10), cloudMat);
+        cloudPiece.position.set((Math.random() - 0.5) * 400, 80 + Math.random() * 30, (Math.random() - 0.5) * 400);
+        cloudsGroup.add(cloudPiece);
+    }
+    scene.add(cloudsGroup);
+}
+
+function initDebris() {
+    // Soda cans, papers, and leaves blown by wind on the tarmac
+    const canMat = new THREE.MeshStandardMaterial({ color: 0xef4444, metalness: 0.8 });
+    const paperMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.9 });
+    const leafMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.9 });
+
+    for (let i = 0; i < 40; i++) {
+        let mesh;
+        const type = Math.random();
+        if (type < 0.33) {
+            mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.25, 8), canMat);
+        } else if (type < 0.66) {
+            mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.4), paperMat);
+            mesh.rotation.x = -Math.PI / 2;
+        } else {
+            mesh = new THREE.Mesh(new THREE.SphereGeometry(0.1, 6, 6), leafMat);
+        }
+
+        mesh.position.set((Math.random() - 0.5) * 200, 0.1, (Math.random() - 0.5) * 200);
+        mesh.userData = {
+            velocity: new THREE.Vector2((0.5 + Math.random() * 1.5), (Math.random() - 0.5) * 0.5)
+        };
+        scene.add(mesh);
+        debrisObjects.push(mesh);
+    }
 }
 
 function updateWeaponMesh() {
@@ -168,13 +211,11 @@ function spawnTacticalSoldier() {
     const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2), armorMat);
     helmet.position.y = 1.78;
 
-    // VISIBLE ASSAULT RIFLE EXTENDING FORWARD FROM THE CHEST
     const rifleGroup = new THREE.Group();
     const rifleBody = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.15, 1.0), new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.9 }));
     const rifleBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.8), new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.9 }));
     rifleBarrel.rotation.x = Math.PI / 2;
     rifleBarrel.position.set(0, 0, -0.7);
-
     rifleGroup.add(rifleBody, rifleBarrel);
     rifleGroup.position.set(0.15, 1.15, -0.4);
     group.add(rifleGroup);
@@ -194,11 +235,12 @@ function spawnTacticalSoldier() {
     group.add(torso, vest, head, helmet, leftArm, rightArm, leftLeg, rightLeg);
 
     const angle = Math.random() * Math.PI * 2;
-    const dist = 30 + Math.random() * 45;
+    const dist = 35 + Math.random() * 45;
     group.position.set(Math.cos(angle) * dist, 0, Math.sin(angle) * dist);
 
     group.userData = {
         health: 100,
+        maxHealth: 100,
         speed: isFemale ? 4.0 : 3.4,
         lastShotTime: 0,
         idealRange: 16 + Math.random() * 8
@@ -206,6 +248,21 @@ function spawnTacticalSoldier() {
 
     scene.add(group);
     enemies.push(group);
+}
+
+function spawnFloatingText(pos, text, color = '#ef4444') {
+    const div = document.createElement('div');
+    div.innerText = text;
+    div.style.position = 'absolute';
+    div.style.color = color;
+    div.style.fontWeight = 'bold';
+    div.style.fontSize = '18px';
+    div.style.textShadow = '0 0 4px #000';
+    div.style.pointerEvents = 'none';
+    div.style.transition = 'transform 0.8s ease-out, opacity 0.8s ease-out';
+    document.body.appendChild(div);
+
+    floatingTexts.push({ element: div, position: pos.clone().add(new THREE.Vector3(0, 2.2, 0)), life: 1.0 });
 }
 
 function spawnLootCrate(pos) {
@@ -249,13 +306,13 @@ function buildEnvironment() {
     environmentObjects.length = 0;
 
     const floorGeo = new THREE.PlaneGeometry(360, 360);
-    const floorMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.9 });
+    const floorMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.9 });
     const floor = new THREE.Mesh(floorGeo, floorMat);
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
     scene.add(floor);
 
-    const tarmacMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.8 });
+    const tarmacMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.8 });
     const stripeMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
 
     for (let pos of [-50, 0, 50]) {
@@ -270,8 +327,8 @@ function buildEnvironment() {
         scene.add(stripe);
     }
 
-    const bWallMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.7 });
-    const windowMat = new THREE.MeshStandardMaterial({ color: 0xfef08a, emissive: 0xca8a04, emissiveIntensity: 0.4 });
+    const bWallMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.6 });
+    const windowMat = new THREE.MeshStandardMaterial({ color: 0xfef08a });
     const doorMat = new THREE.MeshStandardMaterial({ color: 0x451a03 });
 
     for (let x = -120; x <= 120; x += 40) {
@@ -331,6 +388,42 @@ function initCharacterPreview() {
     animPrev();
 }
 
+function createGameOverOverlay() {
+    if (document.getElementById('game-over-screen')) return;
+    const overlay = document.createElement('div');
+    overlay.id = 'game-over-screen';
+    overlay.className = 'hidden';
+    overlay.style.position = 'fixed';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.width = '100vw';
+    overlay.style.height = '100vh';
+    overlay.style.backgroundColor = 'rgba(10, 14, 26, 0.85)';
+    overlay.style.display = 'flex';
+    overlay.style.flexDirection = 'column';
+    overlay.style.justifyContent = 'center';
+    overlay.style.alignItems = 'center';
+    overlay.style.zIndex = '9999';
+
+    overlay.innerHTML = `
+        <h1 style="color: #ef4444; font-size: 3rem; font-family: sans-serif; letter-spacing: 2px; margin-bottom: 10px;">MISSION FAILED</h1>
+        <p style="color: #cbd5e1; font-size: 1.2rem; margin-bottom: 30px;">You were eliminated in the tactical sector.</p>
+        <button id="redeploy-btn" style="background-color: #9333ea; color: white; border: none; padding: 14px 28px; font-size: 1.1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: background 0.2s;">DEPLOY AGAIN</button>
+    `;
+    document.body.appendChild(overlay);
+
+    document.getElementById('redeploy-btn').onclick = () => {
+        health = 100;
+        ammoInMag = 30;
+        reserveAmmo = 90;
+        isGameOver = false;
+        document.getElementById('health-val').innerText = '100';
+        document.getElementById('ammo-val').innerText = `${ammoInMag} / ${reserveAmmo} (M16)`;
+        overlay.classList.add('hidden');
+        document.body.requestPointerLock();
+    };
+}
+
 function setupMenuUI() {
     const deployBtn = document.getElementById('start-deployment-btn');
     if (deployBtn) {
@@ -357,6 +450,7 @@ function updateCompassAndElevation() {
 }
 
 function performAction() {
+    if (isGameOver) return;
     if (currentWeapon === 'M16') {
         if (isReloading) return;
         if (ammoInMag <= 0) {
@@ -384,8 +478,10 @@ function performAction() {
             const dist = camera.position.distanceTo(hitObj.position);
             if (currentWeapon === 'Bat' && dist > 3.5) return;
 
-            hitObj.userData.health -= (currentWeapon === 'Bat' ? 60 : 35);
+            const damageVal = currentWeapon === 'Bat' ? 60 : 35;
+            hitObj.userData.health -= damageVal;
             playSound('hit');
+            spawnFloatingText(hitObj.position, `-${damageVal}`);
 
             if (hitObj.userData.health <= 0) {
                 spawnLootCrate(hitObj.position);
@@ -399,7 +495,7 @@ function performAction() {
 }
 
 document.addEventListener('keydown', (e) => {
-    if (document.pointerLockElement !== document.body) return;
+    if (document.pointerLockElement !== document.body || isGameOver) return;
     if (e.code === 'KeyR') {
         reloadWeapon();
     } else if (e.key === '1') {
@@ -414,7 +510,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 document.addEventListener('mousedown', (e) => {
-    if (document.pointerLockElement !== document.body) return;
+    if (document.pointerLockElement !== document.body || isGameOver) return;
     if (e.button === 0) performAction();
 });
 
@@ -424,8 +520,43 @@ function animate() {
     const time = performance.now();
     const delta = (time - prevTime) / 1000;
 
-    if (controls) controls.update(delta);
+    if (!isGameOver && controls) controls.update(delta);
     updateCompassAndElevation();
+
+    // Move Clouds with wind
+    if (cloudsGroup) {
+        cloudsGroup.position.x += delta * 1.5;
+        if (cloudsGroup.position.x > 200) cloudsGroup.position.x = -200;
+    }
+
+    // Move Debris with wind
+    for (let debris of debrisObjects) {
+        debris.position.x += debris.userData.velocity.x * delta;
+        debris.position.z += debris.userData.velocity.y * delta;
+        if (debris.position.x > 180) debris.position.x = -180;
+        if (debris.position.z > 180) debris.position.z = -180;
+    }
+
+    // Update Floating Text positions
+    for (let i = floatingTexts.length - 1; i >= 0; i--) {
+        const ft = floatingTexts[i];
+        ft.life -= delta;
+        ft.position.y += delta * 1.0;
+
+        const vector = ft.position.clone();
+        vector.project(camera);
+
+        const x = (vector.x * .5 + .5) * window.innerWidth;
+        const y = (-(vector.y * .5) + .5) * window.innerHeight;
+
+        ft.element.style.transform = `translate(-50%, -50%) translate(${x}px,${y}px)`;
+        ft.element.style.opacity = ft.life;
+
+        if (ft.life <= 0) {
+            ft.element.remove();
+            floatingTexts.splice(i, 1);
+        }
+    }
 
     // Check Loot pickups
     for (let i = lootCrates.length - 1; i >= 0; i--) {
@@ -443,31 +574,39 @@ function animate() {
     }
 
     // TACTICAL STANDOFF COMBAT SQUAD AI
-    for (let i = 0; i < enemies.length; i++) {
-        const enemy = enemies[i];
-        const distToPlayer = enemy.position.distanceTo(camera.position);
+    if (!isGameOver) {
+        for (let i = 0; i < enemies.length; i++) {
+            const enemy = enemies[i];
+            const distToPlayer = enemy.position.distanceTo(camera.position);
 
-        enemy.lookAt(camera.position.x, enemy.position.y, camera.position.z);
+            enemy.lookAt(camera.position.x, enemy.position.y, camera.position.z);
 
-        if (distToPlayer > enemy.userData.idealRange + 3) {
-            const dir = new THREE.Vector3().subVectors(camera.position, enemy.position);
-            dir.y = 0;
-            dir.normalize();
-            enemy.position.addScaledVector(dir, enemy.userData.speed * delta);
-        } else if (distToPlayer < enemy.userData.idealRange - 3) {
-            const dir = new THREE.Vector3().subVectors(enemy.position, camera.position);
-            dir.y = 0;
-            dir.normalize();
-            enemy.position.addScaledVector(dir, enemy.userData.speed * 0.7 * delta);
-        }
+            if (distToPlayer > enemy.userData.idealRange + 3) {
+                const dir = new THREE.Vector3().subVectors(camera.position, enemy.position);
+                dir.y = 0;
+                dir.normalize();
+                enemy.position.addScaledVector(dir, enemy.userData.speed * delta);
+            } else if (distToPlayer < enemy.userData.idealRange - 3) {
+                const dir = new THREE.Vector3().subVectors(enemy.position, camera.position);
+                dir.y = 0;
+                dir.normalize();
+                enemy.position.addScaledVector(dir, enemy.userData.speed * 0.7 * delta);
+            }
 
-        if (distToPlayer <= 25) {
-            if (time - enemy.userData.lastShotTime > 1500) {
-                enemy.userData.lastShotTime = time;
-                playSound('enemy_shot');
-                health = Math.max(0, health - 10);
-                document.getElementById('health-val').innerText = Math.floor(health);
-                playSound('damage');
+            if (distToPlayer <= 25) {
+                if (time - enemy.userData.lastShotTime > 1500) {
+                    enemy.userData.lastShotTime = time;
+                    playSound('enemy_shot');
+                    health = Math.max(0, health - 10);
+                    document.getElementById('health-val').innerText = Math.floor(health);
+                    playSound('damage');
+
+                    if (health <= 0) {
+                        isGameOver = true;
+                        document.exitPointerLock();
+                        document.getElementById('game-over-screen').classList.remove('hidden');
+                    }
+                }
             }
         }
     }
