@@ -7,14 +7,16 @@ let controls;
 let isScoped = false;
 let gunGroup;
 
-let currentWeapon = 'M16'; // 'M16', 'Bat', 'Sword'
-let selectedMap = 'city';
+let currentWeapon = 'M16';
+let selectedMap = 'city'; // 'city', 'forest', 'desert'
+let timeMode = 'day';     // 'day', 'night', 'auto'
+let graphicsQuality = 'high';
 
 let ammoInMag = 30;
 let reserveAmmo = 90;
 let isReloading = false;
 let health = 100;
-let shieldEnergy = 0; // Earned from kills, max 100
+let shieldEnergy = 0;
 let isShieldActive = false;
 let isGameOver = false;
 
@@ -31,7 +33,7 @@ const lootCrates = [];
 const floatingTexts = [];
 const debrisObjects = [];
 const environmentObjects = [];
-let dirLight, ambientLight, cloudsGroup;
+let dirLight, ambientLight, cloudsGroup, skyMesh;
 let miniMapCtx, miniMapCanvas;
 let prevTime = performance.now();
 
@@ -100,78 +102,77 @@ function initGame() {
     if (!container) return;
 
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x38bdf8);
-    scene.fog = new THREE.FogExp2(0x38bdf8, 0.003);
+    updateLightingAndSky();
 
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     camera.position.set(0, 1.6, 10);
 
-    renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    renderer = new THREE.WebGLRenderer({ antialias: graphicsQuality === 'high', powerPreference: "high-performance" });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
-    renderer.shadowMap.enabled = true;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, graphicsQuality === 'high' ? 1.5 : 1.0));
+    renderer.shadowMap.enabled = (graphicsQuality === 'high');
     container.appendChild(renderer.domElement);
 
-    ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
-    scene.add(ambientLight);
-
-    dirLight = new THREE.DirectionalLight(0xfffbeb, 1.2);
-    dirLight.position.set(100, 150, 50);
-    dirLight.castShadow = true;
-    scene.add(dirLight);
-
-    initDaySkyAndSun();
-    initDebris();
     updateWeaponMesh();
-    buildEnvironment();
+    buildEnvironment(selectedMap);
     controls = initFirstPersonControls(camera, environmentObjects);
 
     for (let i = 0; i < 7; i++) spawnTacticalSoldier();
 
-    setupMenuUI();
+    setupLobbyUI();
     initCharacterPreview();
     createHUDOverlays();
     animate();
 }
 
-function initDaySkyAndSun() {
-    const sunGeo = new THREE.SphereGeometry(10, 24, 24);
-    const sunMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
-    const sun = new THREE.Mesh(sunGeo, sunMat);
-    sun.position.set(100, 150, 50);
-    scene.add(sun);
-
-    cloudsGroup = new THREE.Group();
-    const cloudMat = new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, roughness: 1.0 });
-    for (let i = 0; i < 20; i++) {
-        const cloudPiece = new THREE.Mesh(new THREE.BoxGeometry(15 + Math.random() * 20, 3, 8 + Math.random() * 10), cloudMat);
-        cloudPiece.position.set((Math.random() - 0.5) * 400, 80 + Math.random() * 30, (Math.random() - 0.5) * 400);
-        cloudsGroup.add(cloudPiece);
+function updateLightingAndSky() {
+    if (timeMode === 'day') {
+        scene.background = new THREE.Color(0x38bdf8);
+        scene.fog = new THREE.FogExp2(0x38bdf8, 0.003);
+        if (ambientLight) ambientLight.intensity = 0.8;
+        if (dirLight) dirLight.intensity = 1.2;
+    } else if (timeMode === 'night') {
+        scene.background = new THREE.Color(0x0a0e1a);
+        scene.fog = new THREE.FogExp2(0x0a0e1a, 0.007);
+        if (ambientLight) ambientLight.intensity = 0.3;
+        if (dirLight) dirLight.intensity = 0.4;
+    } else { // Auto cycle
+        const hour = new Date().getHours();
+        const isDay = hour >= 6 && hour < 18;
+        scene.background = new THREE.Color(isDay ? 0x38bdf8 : 0x0a0e1a);
+        scene.fog = new THREE.FogExp2(isDay ? 0x38bdf8 : 0x0a0e1a, isDay ? 0.003 : 0.007);
     }
-    scene.add(cloudsGroup);
+
+    if (!ambientLight) {
+        ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        scene.add(ambientLight);
+    }
+    if (!dirLight) {
+        dirLight = new THREE.DirectionalLight(0xfffbeb, 1.2);
+        dirLight.position.set(100, 150, 50);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+    }
 }
 
 function initDebris() {
+    debrisObjects.forEach(d => scene.remove(d));
+    debrisObjects.length = 0;
+
     const canMat = new THREE.MeshStandardMaterial({ color: 0xef4444, metalness: 0.8 });
     const paperMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.9 });
-    const leafMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.9 });
 
-    for (let i = 0; i < 50; i++) {
-        let mesh;
-        const type = Math.random();
-        if (type < 0.33) {
-            mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.25, 8), canMat);
-        } else if (type < 0.66) {
-            mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.4), paperMat);
-            mesh.rotation.x = -Math.PI / 2;
-        } else {
-            mesh = new THREE.Mesh(new THREE.SphereGeometry(0.1, 6, 6), leafMat);
-        }
+    for (let i = 0; i < 40; i++) {
+        let mesh = Math.random() > 0.5 ?
+            new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.25, 8), canMat) :
+            new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.4), paperMat);
 
-        mesh.position.set((Math.random() - 0.5) * 200, 0.1, (Math.random() - 0.5) * 200);
+        if (mesh.geometry.type === 'PlaneGeometry') mesh.rotation.x = -Math.PI / 2;
+
+        mesh.position.set((Math.random() - 0.5) * 180, 0.1, (Math.random() - 0.5) * 180);
         mesh.userData = {
-            velocity: new THREE.Vector2((2.5 + Math.random() * 2.0), (Math.random() - 0.5) * 0.8),
-            rotSpeed: Math.random() * 3
+            velocity: new THREE.Vector2((2.0 + Math.random() * 1.5), (Math.random() - 0.5) * 0.5),
+            rotSpeed: Math.random() * 2
         };
         scene.add(mesh);
         debrisObjects.push(mesh);
@@ -348,61 +349,83 @@ function activateShield() {
     }, 5000);
 }
 
-function buildEnvironment() {
+function buildEnvironment(mapType) {
     environmentObjects.forEach(obj => scene.remove(obj));
     environmentObjects.length = 0;
 
-    const floorGeo = new THREE.PlaneGeometry(360, 360);
-    const floorMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.9 });
-    const floor = new THREE.Mesh(floorGeo, floorMat);
-    floor.rotation.x = -Math.PI / 2;
-    floor.receiveShadow = true;
-    scene.add(floor);
+    if (mapType === 'city') {
+        const floorGeo = new THREE.PlaneGeometry(360, 360);
+        const floorMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.9 });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        floor.receiveShadow = true;
+        scene.add(floor);
+        environmentObjects.push(floor);
 
-    const tarmacMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.8 });
-    const stripeMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+        const tarmacMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.8 });
+        const stripeMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
 
-    for (let pos of [-50, 0, 50]) {
-        const road = new THREE.Mesh(new THREE.PlaneGeometry(14, 360), tarmacMat);
-        road.rotation.x = -Math.PI / 2;
-        road.position.set(pos, 0.01, 0);
-        scene.add(road);
-
-        const stripe = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 360), stripeMat);
-        stripe.rotation.x = -Math.PI / 2;
-        stripe.position.set(pos, 0.02, 0);
-        scene.add(stripe);
-    }
-
-    const bWallMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.6 });
-    const windowMat = new THREE.MeshStandardMaterial({ color: 0xfef08a });
-    const doorMat = new THREE.MeshStandardMaterial({ color: 0x451a03 });
-
-    for (let x = -120; x <= 120; x += 40) {
-        for (let z = -120; z <= 120; z += 40) {
-            if (Math.abs(x) < 18 || Math.abs(z) < 18) continue;
-
-            const bGroup = new THREE.Group();
-            const height = 16 + Math.random() * 8;
-            const mainBox = new THREE.Mesh(new THREE.BoxGeometry(14, height, 14), bWallMat);
-            mainBox.position.y = height / 2;
-            bGroup.add(mainBox);
-
-            const door = new THREE.Mesh(new THREE.BoxGeometry(2.2, 3.5, 0.4), doorMat);
-            door.position.set(0, 1.75, 7.05);
-            bGroup.add(door);
-
-            for (let wy = 5; wy < height - 2; wy += 4) {
-                const win = new THREE.Mesh(new THREE.BoxGeometry(1.5, 2, 0.2), windowMat);
-                win.position.set(0, wy, 7.05);
-                bGroup.add(win);
-            }
-
-            bGroup.position.set(x, 0, z);
-            scene.add(bGroup);
-            environmentObjects.push(bGroup);
+        for (let pos of [-50, 0, 50]) {
+            const road = new THREE.Mesh(new THREE.PlaneGeometry(14, 360), tarmacMat);
+            road.rotation.x = -Math.PI / 2;
+            road.position.set(pos, 0.01, 0);
+            scene.add(road);
+            environmentObjects.push(road);
         }
+
+        // City Fountain & Monument in center
+        const fountainBase = new THREE.Mesh(new THREE.CylinderGeometry(4, 4, 1, 16), new THREE.MeshStandardMaterial({ color: 0x94a3b8 }));
+        fountainBase.position.set(20, 0.5, 20);
+        const statue = new THREE.Mesh(new THREE.ConeGeometry(1.2, 4, 8), new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.8 }));
+        statue.position.set(20, 3, 20);
+        scene.add(fountainBase, statue);
+        environmentObjects.push(fountainBase, statue);
+
+        const bWallMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.6 });
+        for (let x = -120; x <= 120; x += 40) {
+            for (let z = -120; z <= 120; z += 40) {
+                if (Math.abs(x) < 18 || Math.abs(z) < 18) continue;
+                const height = 16 + Math.random() * 8;
+                const mainBox = new THREE.Mesh(new THREE.BoxGeometry(14, height, 14), bWallMat);
+                mainBox.position.set(x, height / 2, z);
+                scene.add(mainBox);
+                environmentObjects.push(mainBox);
+            }
+        }
+    } else if (mapType === 'forest') {
+        // Hilly green terrain with ground water stream
+        const terrainGeo = new THREE.PlaneGeometry(360, 360, 32, 32);
+        const posAttr = terrainGeo.attributes.position;
+        for (let i = 0; i < posAttr.count; i++) {
+            const vx = posAttr.getX(i);
+            const vy = posAttr.getY(i);
+            posAttr.setZ(i, Math.sin(vx * 0.03) * Math.cos(vy * 0.03) * 6);
+        }
+        terrainGeo.computeVertexNormals();
+
+        const terrainMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.8 });
+        const terrain = new THREE.Mesh(terrainGeo, terrainMat);
+        terrain.rotation.x = -Math.PI / 2;
+        scene.add(terrain);
+        environmentObjects.push(terrain);
+
+        // Ground water stream
+        const waterGeo = new THREE.PlaneGeometry(20, 360);
+        const waterMat = new THREE.MeshStandardMaterial({ color: 0x0ea5e9, roughness: 0.2, transparent: true, opacity: 0.8 });
+        const waterStream = new THREE.Mesh(waterGeo, waterMat);
+        waterStream.rotation.x = -Math.PI / 2;
+        waterStream.position.set(0, 0.2, 0);
+        scene.add(waterStream);
+        environmentObjects.push(waterStream);
+    } else if (mapType === 'desert') {
+        const sandMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.9 });
+        const desertFloor = new THREE.Mesh(new THREE.PlaneGeometry(360, 360), sandMat);
+        desertFloor.rotation.x = -Math.PI / 2;
+        scene.add(desertFloor);
+        environmentObjects.push(desertFloor);
     }
+
+    if (timeMode !== 'night') initDebris();
 }
 
 function initCharacterPreview() {
@@ -436,7 +459,7 @@ function initCharacterPreview() {
 }
 
 function createHUDOverlays() {
-    // Mini-map on bottom-left above bottom bar
+    // Mini-map on bottom-left
     const mapDiv = document.createElement('div');
     mapDiv.id = 'minimap-container';
     mapDiv.style.position = 'fixed';
@@ -459,7 +482,7 @@ function createHUDOverlays() {
     document.body.appendChild(mapDiv);
     miniMapCtx = miniMapCanvas.getContext('2d');
 
-    // Combat Stats HUD cleanly positioned below the Health Panel on top-left (no overlap)
+    // Combat Stats HUD
     const hudInfo = document.createElement('div');
     hudInfo.id = 'combat-hud-stats';
     hudInfo.style.position = 'fixed';
@@ -516,7 +539,7 @@ function createHUDOverlays() {
     };
 }
 
-function setupMenuUI() {
+function setupLobbyUI() {
     const deployBtn = document.getElementById('start-deployment-btn');
     if (deployBtn) {
         deployBtn.onclick = () => {
@@ -527,6 +550,88 @@ function setupMenuUI() {
 
             document.body.requestPointerLock();
             initVoiceChat();
+        };
+    }
+
+    // Add Story Paragraph & Settings Gear to Lobby Menu
+    const lobbyMenu = document.getElementById('lobby-menu');
+    if (lobbyMenu && !document.getElementById('story-desc')) {
+        const storyDiv = document.createElement('div');
+        storyDiv.id = 'story-desc';
+        storyDiv.style.padding = '10px 15px';
+        storyDiv.style.color = '#94a3b8';
+        storyDiv.style.fontSize = '0.9rem';
+        storyDiv.style.lineHeight = '1.4';
+        storyDiv.innerHTML = `<strong>Mission Briefing:</strong> Deploy into hostile sectors armed with assault rifles and tactical melee gear. Eliminate opposing combat squads in last-man-standing gunfights, collect ammo crates from fallen foes, and climb the military ranks!`;
+        lobbyMenu.insertBefore(storyDiv, lobbyMenu.firstChild);
+
+        // Settings Gear Button
+        const gearBtn = document.createElement('button');
+        gearBtn.innerHTML = '⚙️ Settings';
+        gearBtn.style.position = 'absolute';
+        gearBtn.style.top = '20px';
+        gearBtn.style.right = '20px';
+        gearBtn.style.background = '#1e293b';
+        gearBtn.style.color = '#fff';
+        gearBtn.style.border = '1px solid #334155';
+        gearBtn.style.padding = '8px 14px';
+        gearBtn.style.borderRadius = '6px';
+        gearBtn.style.cursor = 'pointer';
+        gearBtn.style.zIndex = '1000';
+
+        // Settings Modal
+        const settingsModal = document.createElement('div');
+        settingsModal.id = 'settings-modal';
+        settingsModal.className = 'hidden';
+        settingsModal.style.position = 'fixed';
+        settingsModal.style.top = '0';
+        settingsModal.style.left = '0';
+        settingsModal.style.width = '100vw';
+        settingsModal.style.height = '100vh';
+        settingsModal.style.backgroundColor = 'rgba(10, 14, 26, 0.9)';
+        settingsModal.style.display = 'flex';
+        settingsModal.style.flexDirection = 'column';
+        settingsModal.style.justifyContent = 'center';
+        settingsModal.style.alignItems = 'center';
+        settingsModal.style.zIndex = '2000';
+
+        settingsModal.innerHTML = `
+            <div style="background: #1e293b; padding: 30px; border-radius: 12px; border: 1px solid #334155; width: 350px;">
+                <h2 style="color: #f8fafc; margin-bottom: 20px;">Game Settings</h2>
+                <label style="color: #cbd5e1; display: block; margin-bottom: 8px;">Time of Day:</label>
+                <select id="setting-time" style="width: 100%; padding: 8px; margin-bottom: 15px; background: #0f172a; color: #fff; border-radius: 6px;">
+                    <option value="day">Day</option>
+                    <option value="night">Night</option>
+                    <option value="auto">Auto (System Time)</option>
+                </select>
+
+                <label style="color: #cbd5e1; display: block; margin-bottom: 8px;">Combat Sector:</label>
+                <select id="setting-map" style="width: 100%; padding: 8px; margin-bottom: 15px; background: #0f172a; color: #fff; border-radius: 6px;">
+                    <option value="city">City Ruins</option>
+                    <option value="forest">Green Forest & Hills</option>
+                    <option value="desert">Arid Desert</option>
+                </select>
+
+                <label style="color: #cbd5e1; display: block; margin-bottom: 8px;">Graphics Quality:</label>
+                <select id="setting-gfx" style="width: 100%; padding: 8px; margin-bottom: 20px; background: #0f172a; color: #fff; border-radius: 6px;">
+                    <option value="high">High (Shadows & Antialias)</option>
+                    <option value="maxfps">Max FPS (Performance)</option>
+                </select>
+
+                <button id="close-settings" style="width: 100%; background: #9333ea; color: white; border: none; padding: 10px; font-weight: bold; border-radius: 6px; cursor: pointer;">Save & Close</button>
+            </div>
+        `;
+        document.body.appendChild(settingsModal);
+        document.body.appendChild(gearBtn);
+
+        gearBtn.onclick = () => settingsModal.classList.remove('hidden');
+        document.getElementById('close-settings').onclick = () => {
+            timeMode = document.getElementById('setting-time').value;
+            selectedMap = document.getElementById('setting-map').value;
+            graphicsQuality = document.getElementById('setting-gfx').value;
+            settingsModal.classList.add('hidden');
+            updateLightingAndSky();
+            buildEnvironment(selectedMap);
         };
     }
 }
@@ -581,9 +686,7 @@ function performAction() {
         ammoInMag--;
         document.getElementById('ammo-val').innerText = `${ammoInMag} / ${reserveAmmo} (M16)`;
         playSound('shot');
-    } else if (currentWeapon === 'Bat') {
-        playSound('swing');
-    } else if (currentWeapon === 'Sword') {
+    } else {
         playSound('swing');
     }
 
@@ -676,11 +779,6 @@ function animate() {
     if (!isGameOver && controls) controls.update(delta);
     updateCompassAndElevation();
     updateMiniMap();
-
-    if (cloudsGroup) {
-        cloudsGroup.position.x += delta * 2.0;
-        if (cloudsGroup.position.x > 200) cloudsGroup.position.x = -200;
-    }
 
     for (let debris of debrisObjects) {
         debris.position.x += debris.userData.velocity.x * delta;
