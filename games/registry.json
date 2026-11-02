@@ -1,20 +1,22 @@
 [
   {
     "id": "neon-ember",
-    "title": "Neon Ember - Arcade Shooter",
+    "title": "Neon Ember",
     "author": "Omni Team",
     "type": "internal",
     "path": "games/neon-ember/index.html",
     "category": "Single Player",
-    "thumbnail": "games/neon-ember/assets/thumb.png"
+    "badge": "⚡ Single Player",
+    "description": "High-intensity neon arcade shooter with custom canvas graphics and synth audio."
   },
   {
-    "id": "cyber-runner",
-    "title": "Cyber Runner",
-    "author": "DevGuru",
+    "id": "cyber-grid-arena",
+    "title": "Cyber Grid Arena",
+    "author": "External Contributor",
     "type": "external",
-    "path": "https://cyber-runner-game.vercel.app",
-    "category": "1v1 Multiplayer",
-    "thumbnail": "https://cyber-runner-game.vercel.app/thumb.png"
+    "path": "https://example.com",
+    "category": "1v1",
+    "badge": "🛡️ 1v1 Battle",
+    "description": "Tactical head-to-head grid combat hosted via external developer network."
   }
 ]
