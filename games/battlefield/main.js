@@ -7,15 +7,24 @@ let controls;
 let isScoped = false;
 let gunGroup;
 
-let currentWeapon = 'M16';
+let currentWeapon = 'M16'; // 'M16', 'Bat', 'Sword'
 let selectedMap = 'city';
-let selectedMode = 'solo';
 
 let ammoInMag = 30;
 let reserveAmmo = 90;
 let isReloading = false;
 let health = 100;
+let shieldEnergy = 0; // Earned from kills, max 100
+let isShieldActive = false;
 let isGameOver = false;
+
+let stats = {
+    kills: 0,
+    headshots: 0,
+    shotsFired: 0,
+    shotsHit: 0,
+    rank: 'Private'
+};
 
 const enemies = [];
 const lootCrates = [];
@@ -23,6 +32,7 @@ const floatingTexts = [];
 const debrisObjects = [];
 const environmentObjects = [];
 let dirLight, ambientLight, cloudsGroup;
+let miniMapCtx, miniMapCanvas;
 let prevTime = performance.now();
 
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -55,6 +65,14 @@ function playSound(type) {
         osc.frequency.setValueAtTime(150, audioCtx.currentTime);
         osc.frequency.setValueAtTime(300, audioCtx.currentTime + 0.2);
         gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.4);
+    } else if (type === 'shield') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(900, audioCtx.currentTime + 0.4);
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
         osc.start();
         osc.stop(audioCtx.currentTime + 0.4);
@@ -112,7 +130,7 @@ function initGame() {
 
     setupMenuUI();
     initCharacterPreview();
-    createGameOverOverlay();
+    createHUDOverlays();
     animate();
 }
 
@@ -183,6 +201,14 @@ function updateWeaponMesh() {
         batMesh.rotation.x = Math.PI / 3;
         batMesh.position.set(0.25, -0.25, -0.45);
         gunGroup.add(batMesh);
+    } else if (currentWeapon === 'Sword') {
+        const hiltMat = new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.9 });
+        const bladeMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.95, roughness: 0.1 });
+        const hilt = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.05, 0.2), hiltMat);
+        hilt.position.set(0.25, -0.3, -0.35);
+        const blade = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.02, 0.9), bladeMat);
+        blade.position.set(0.25, -0.28, -0.8);
+        gunGroup.add(hilt, blade);
     }
 
     camera.add(gunGroup);
@@ -209,16 +235,12 @@ function spawnTacticalSoldier() {
     const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2), armorMat);
     helmet.position.y = 1.78;
 
-    // FULLY VISIBLE ARMED ASSAULT RIFLE HELD BY SOLDIER
     const rifleGroup = new THREE.Group();
     const rifleBody = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.15, 1.1), new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.9 }));
     const rifleBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.9), new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.9 }));
     rifleBarrel.rotation.x = Math.PI / 2;
     rifleBarrel.position.set(0, 0, -0.8);
-    const rifleStock = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.12, 0.35), new THREE.MeshStandardMaterial({ color: 0x332211 }));
-    rifleStock.position.set(0, 0, 0.6);
-
-    rifleGroup.add(rifleBody, rifleBarrel, rifleStock);
+    rifleGroup.add(rifleBody, rifleBarrel);
     rifleGroup.position.set(0.2, 1.15, -0.4);
     group.add(rifleGroup);
 
@@ -310,6 +332,22 @@ function reloadWeapon() {
     }, 1500);
 }
 
+function activateShield() {
+    if (shieldEnergy < 100 || isShieldActive) return;
+    isShieldActive = true;
+    shieldEnergy = 0;
+    playSound('shield');
+
+    const shieldIndicator = document.getElementById('shield-status');
+    if (shieldIndicator) shieldIndicator.innerText = `SHIELD ACTIVE (5s)`;
+    document.getElementById('shield-bar').style.width = `0%`;
+
+    setTimeout(() => {
+        isShieldActive = false;
+        if (shieldIndicator) shieldIndicator.innerText = `SHIELD READY (Press Q)`;
+    }, 5000);
+}
+
 function buildEnvironment() {
     environmentObjects.forEach(obj => scene.remove(obj));
     environmentObjects.length = 0;
@@ -397,8 +435,52 @@ function initCharacterPreview() {
     animPrev();
 }
 
-function createGameOverOverlay() {
-    if (document.getElementById('game-over-screen')) return;
+function createHUDOverlays() {
+    // Mini-map on left side
+    const mapDiv = document.createElement('div');
+    mapDiv.id = 'minimap-container';
+    mapDiv.style.position = 'fixed';
+    mapDiv.style.left = '20px';
+    mapDiv.style.bottom = '80px';
+    mapDiv.style.width = '160px';
+    mapDiv.style.height = '160px';
+    mapDiv.style.backgroundColor = 'rgba(15, 23, 42, 0.85)';
+    mapDiv.style.border = '2px solid #38bdf8';
+    mapDiv.style.borderRadius = '12px';
+    mapDiv.style.overflow = 'hidden';
+    mapDiv.style.zIndex = '100';
+
+    miniMapCanvas = document.createElement('canvas');
+    miniMapCanvas.width = 160;
+    miniMapCanvas.height = 160;
+    miniMapCanvas.style.width = '100%';
+    miniMapCanvas.style.height = '100%';
+    mapDiv.appendChild(miniMapCanvas);
+    document.body.appendChild(mapDiv);
+    miniMapCtx = miniMapCanvas.getContext('2d');
+
+    // Shield & Stats HUD Top-Right / Left
+    const hudInfo = document.createElement('div');
+    hudInfo.id = 'combat-hud-stats';
+    hudInfo.style.position = 'fixed';
+    hudInfo.style.left = '20px';
+    hudInfo.style.top = '20px';
+    hudInfo.style.color = '#f8fafc';
+    hudInfo.style.fontFamily = 'sans-serif';
+    hudInfo.style.fontSize = '14px';
+    hudInfo.style.textShadow = '0 0 3px #000';
+    hudInfo.style.zIndex = '100';
+    hudInfo.innerHTML = `
+        <div>Rank: <span id="rank-val" style="color: #facc15; font-weight: bold;">Private</span></div>
+        <div>Kills: <span id="kills-val">0</span> | Headshots: <span id="headshots-val">0</span></div>
+        <div style="margin-top: 6px;">Shield: <span id="shield-status" style="color: #38bdf8; font-weight: bold;">Charging...</span></div>
+        <div style="width: 120px; height: 8px; background: #334155; border-radius: 4px; overflow: hidden; margin-top: 3px;">
+            <div id="shield-bar" style="width: 0%; height: 100%; background: #38bdf8; transition: width 0.2s;"></div>
+        </div>
+    `;
+    document.body.appendChild(hudInfo);
+
+    // Game Over Overlay
     const overlay = document.createElement('div');
     overlay.id = 'game-over-screen';
     overlay.className = 'hidden';
@@ -417,7 +499,7 @@ function createGameOverOverlay() {
     overlay.innerHTML = `
         <h1 style="color: #ef4444; font-size: 3rem; font-family: sans-serif; letter-spacing: 2px; margin-bottom: 10px;">MISSION FAILED</h1>
         <p style="color: #cbd5e1; font-size: 1.2rem; margin-bottom: 30px;">You were eliminated in the tactical sector.</p>
-        <button id="redeploy-btn" style="background-color: #9333ea; color: white; border: none; padding: 14px 28px; font-size: 1.1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: background 0.2s;">DEPLOY AGAIN</button>
+        <button id="redeploy-btn" style="background-color: #9333ea; color: white; border: none; padding: 14px 28px; font-size: 1.1rem; font-weight: bold; border-radius: 8px; cursor: pointer;">DEPLOY AGAIN</button>
     `;
     document.body.appendChild(overlay);
 
@@ -425,6 +507,7 @@ function createGameOverOverlay() {
         health = 100;
         ammoInMag = 30;
         reserveAmmo = 90;
+        shieldEnergy = 0;
         isGameOver = false;
         document.getElementById('health-val').innerText = '100';
         document.getElementById('ammo-val').innerText = `${ammoInMag} / ${reserveAmmo} (M16)`;
@@ -448,6 +531,37 @@ function setupMenuUI() {
     }
 }
 
+function updateMiniMap() {
+    if (!miniMapCtx) return;
+    miniMapCtx.clearRect(0, 0, 160, 160);
+
+    // Background grid
+    miniMapCtx.fillStyle = '#0f172a';
+    miniMapCtx.fillRect(0, 0, 160, 160);
+
+    // Center player on mini-map
+    const px = 80;
+    const py = 80;
+
+    // Draw Enemies as red dots
+    for (let enemy of enemies) {
+        const dx = (enemy.position.x - camera.position.x) * 2.0;
+        const dz = (enemy.position.z - camera.position.z) * 2.0;
+        if (Math.abs(dx) < 80 && Math.abs(dz) < 80) {
+            miniMapCtx.fillStyle = '#ef4444';
+            miniMapCtx.beginPath();
+            miniMapCtx.arc(px + dx, py + dz, 3, 0, Math.PI * 2);
+            miniMapCtx.fill();
+        }
+    }
+
+    // Draw Player marker
+    miniMapCtx.fillStyle = '#38bdf8';
+    miniMapCtx.beginPath();
+    miniMapCtx.arc(px, py, 4, 0, Math.PI * 2);
+    miniMapCtx.fill();
+}
+
 function updateCompassAndElevation() {
     const dir = new THREE.Vector3();
     camera.getWorldDirection(dir);
@@ -460,6 +574,8 @@ function updateCompassAndElevation() {
 
 function performAction() {
     if (isGameOver) return;
+    stats.shotsFired++;
+
     if (currentWeapon === 'M16') {
         if (isReloading) return;
         if (ammoInMag <= 0) {
@@ -469,7 +585,9 @@ function performAction() {
         ammoInMag--;
         document.getElementById('ammo-val').innerText = `${ammoInMag} / ${reserveAmmo} (M16)`;
         playSound('shot');
-    } else {
+    } else if (currentWeapon === 'Bat') {
+        playSound('swing');
+    } else if (currentWeapon === 'Sword') {
         playSound('swing');
     }
 
@@ -485,15 +603,34 @@ function performAction() {
 
         if (hitObj.userData && hitObj.userData.health) {
             const dist = camera.position.distanceTo(hitObj.position);
-            if (currentWeapon === 'Bat' && dist > 3.5) return;
+            if ((currentWeapon === 'Bat' || currentWeapon === 'Sword') && dist > 3.5) return;
 
-            const damageVal = currentWeapon === 'Bat' ? 60 : 35;
+            stats.shotsHit++;
+            const isHeadshot = intersects[0].point.y > hitObj.position.y + 1.5;
+            if (isHeadshot) stats.headshots++;
+
+            const damageVal = currentWeapon === 'M16' ? (isHeadshot ? 70 : 35) : (currentWeapon === 'Sword' ? 85 : 55);
             hitObj.userData.health -= damageVal;
             playSound('hit');
             spawnHitEffect(intersects[0].point);
-            spawnFloatingText(hitObj.position, `-${damageVal}`);
+            spawnFloatingText(hitObj.position, isHeadshot ? `HEADSHOT -${damageVal}` : `-${damageVal}`, isHeadshot ? '#facc15' : '#ef4444');
 
             if (hitObj.userData.health <= 0) {
+                stats.kills++;
+                shieldEnergy = Math.min(100, shieldEnergy + 35);
+                document.getElementById('shield-bar').style.width = `${shieldEnergy}%`;
+                if (shieldEnergy >= 100) {
+                    document.getElementById('shield-status').innerText = `SHIELD READY (Press Q)`;
+                }
+
+                // Promotion logic
+                if (stats.kills >= 10) stats.rank = 'General';
+                else if (stats.kills >= 6) stats.rank = 'Sergeant';
+                else if (stats.kills >= 3) stats.rank = 'Corporal';
+                document.getElementById('rank-val').innerText = stats.rank;
+                document.getElementById('kills-val').innerText = stats.kills;
+                document.getElementById('headshots-val').innerText = stats.headshots;
+
                 spawnLootCrate(hitObj.position);
                 scene.remove(hitObj);
                 const idx = enemies.indexOf(hitObj);
@@ -504,11 +641,24 @@ function performAction() {
     }
 }
 
+// Keybindings for Scope (Right-Click simulation / Key controls), Reload, Weapons, and Shield
+document.addEventListener('mousedown', (e) => {
+    if (document.pointerLockElement !== document.body || isGameOver) return;
+    if (e.button === 0) performAction();
+    else if (e.button === 2) { // Right Click Scope
+        isScoped = !isScoped;
+        camera.fov = isScoped ? 35 : 75;
+        camera.updateProjectionMatrix();
+    }
+});
+
+document.addEventListener('contextmenu', e => e.preventDefault());
+
 document.addEventListener('keydown', (e) => {
     if (document.pointerLockElement !== document.body || isGameOver) return;
-    if (e.code === 'KeyR') {
-        reloadWeapon();
-    } else if (e.key === '1') {
+    if (e.code === 'KeyR') reloadWeapon();
+    else if (e.code === 'KeyQ') activateShield();
+    else if (e.key === '1') {
         currentWeapon = 'M16';
         updateWeaponMesh();
         document.getElementById('ammo-val').innerText = `${ammoInMag} / ${reserveAmmo} (M16)`;
@@ -516,12 +666,11 @@ document.addEventListener('keydown', (e) => {
         currentWeapon = 'Bat';
         updateWeaponMesh();
         document.getElementById('ammo-val').innerText = `Melee Ready (Bat)`;
+    } else if (e.key === '3') {
+        currentWeapon = 'Sword';
+        updateWeaponMesh();
+        document.getElementById('ammo-val').innerText = `Melee Ready (Sword)`;
     }
-});
-
-document.addEventListener('mousedown', (e) => {
-    if (document.pointerLockElement !== document.body || isGameOver) return;
-    if (e.button === 0) performAction();
 });
 
 function animate() {
@@ -532,6 +681,7 @@ function animate() {
 
     if (!isGameOver && controls) controls.update(delta);
     updateCompassAndElevation();
+    updateMiniMap();
 
     // Clouds movement
     if (cloudsGroup) {
@@ -584,7 +734,7 @@ function animate() {
         }
     }
 
-    // TACTICAL STANDOFF COMBAT SQUAD AI (Balanced damage and visible rifles)
+    // TACTICAL STANDOFF COMBAT SQUAD AI
     if (!isGameOver) {
         for (let i = 0; i < enemies.length; i++) {
             const enemy = enemies[i];
@@ -605,12 +755,15 @@ function animate() {
             }
 
             if (distToPlayer <= 25) {
-                if (time - enemy.userData.lastShotTime > 2200) { // Slower fire rate so you don't instantly die
+                if (time - enemy.userData.lastShotTime > 2200) {
                     enemy.userData.lastShotTime = time;
                     playSound('enemy_shot');
-                    health = Math.max(0, health - 8); // Balanced damage per hit
-                    document.getElementById('health-val').innerText = Math.floor(health);
-                    playSound('damage');
+
+                    if (!isShieldActive) {
+                        health = Math.max(0, health - 8);
+                        document.getElementById('health-val').innerText = Math.floor(health);
+                        playSound('damage');
+                    }
 
                     if (health <= 0) {
                         isGameOver = true;
