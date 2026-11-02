@@ -65,10 +65,14 @@ function initGame() {
     gridHelper.position.y = 0.01;
     scene.add(gridHelper);
 
-    // 2. Loadout Preview Box Rendering
-    initCharacterPreview();
+    // Build initial background environment & preview characters immediately
+    buildEnvironment(selectedMap);
+    for (let i = 0; i < 4; i++) spawnEnemy('zombie');
 
-    // 3. Attach Menu Button Listeners (Guaranteed DOM Ready)
+    // 2. Loadout Preview Box Rendering (with safe timeout for container sizing)
+    setTimeout(initCharacterPreview, 100);
+
+    // 3. Attach Menu Button Listeners
     setupMenuUI();
 
     // 4. Controls & Animation Loop
@@ -87,13 +91,16 @@ function initCharacterPreview() {
     const previewContainer = document.getElementById('character-preview-container');
     if (!previewContainer) return;
 
+    const width = previewContainer.clientWidth || 350;
+    const height = previewContainer.clientHeight || 180;
+
     const pScene = new THREE.Scene();
     pScene.background = new THREE.Color(0x0b070f);
-    const pCamera = new THREE.PerspectiveCamera(50, previewContainer.clientWidth / previewContainer.clientHeight, 0.1, 50);
+    const pCamera = new THREE.PerspectiveCamera(50, width / height, 0.1, 50);
     pCamera.position.set(0, 1.2, 3.5);
 
     const pRenderer = new THREE.WebGLRenderer({ antialias: true });
-    pRenderer.setSize(previewContainer.clientWidth, previewContainer.clientHeight);
+    pRenderer.setSize(width, height);
     previewContainer.appendChild(pRenderer.domElement);
 
     const pLight = new THREE.DirectionalLight(0xffffff, 1.5);
@@ -123,7 +130,7 @@ function initCharacterPreview() {
 
     function animatePreview() {
         requestAnimationFrame(animatePreview);
-        charGroup.rotation.y += 0.01;
+        charGroup.rotation.y += 0.015;
         pRenderer.render(pScene, pCamera);
     }
     animatePreview();
@@ -131,16 +138,15 @@ function initCharacterPreview() {
 
 // Menu UI Interactivity & Deployment Trigger
 function setupMenuUI() {
-    // Map Selection
     document.querySelectorAll('#map-selector .option-btn').forEach(btn => {
         btn.onclick = (e) => {
             document.querySelectorAll('#map-selector .option-btn').forEach(b => b.classList.remove('active'));
             e.currentTarget.classList.add('active');
             selectedMap = e.currentTarget.dataset.map;
+            buildEnvironment(selectedMap); // Update background map live!
         };
     });
 
-    // Game Mode Selection
     document.querySelectorAll('#mode-selector .option-btn').forEach(btn => {
         btn.onclick = (e) => {
             document.querySelectorAll('#mode-selector .option-btn').forEach(b => b.classList.remove('active'));
@@ -149,7 +155,6 @@ function setupMenuUI() {
         };
     });
 
-    // Graphics Quality Selection
     document.querySelectorAll('#graphics-selector .option-btn').forEach(btn => {
         btn.onclick = (e) => {
             document.querySelectorAll('#graphics-selector .option-btn').forEach(b => b.classList.remove('active'));
@@ -158,7 +163,6 @@ function setupMenuUI() {
         };
     });
 
-    // Deploy Button Action
     const deployBtn = document.getElementById('start-deployment-btn');
     if (deployBtn) {
         deployBtn.onclick = () => {
@@ -174,9 +178,6 @@ function setupMenuUI() {
                 renderer.shadowMap.enabled = true;
                 renderer.setPixelRatio(window.devicePixelRatio);
             }
-
-            buildEnvironment(selectedMap);
-            for (let i = 0; i < 6; i++) spawnEnemy('zombie');
 
             document.body.requestPointerLock();
             initVoiceChat();
@@ -244,7 +245,7 @@ function spawnEnemy(type = 'zombie') {
     enemies.push(group);
 }
 
-// In-Game Input Controls
+// Controls & Combat Mechanics
 document.addEventListener('keydown', (e) => {
     if (e.code === 'Digit1') { currentWeapon = 'M16'; updateHUD(); }
     if (e.code === 'Digit2') { currentWeapon = 'PISTOL'; updateHUD(); }
@@ -317,7 +318,6 @@ function throwGrenade() {
     }, 16);
 }
 
-// Scope ADS & Shooting Mouse Handlers
 document.addEventListener('mousedown', (e) => {
     if (document.pointerLockElement !== document.body) return;
     if (e.button === 2) {
@@ -341,7 +341,6 @@ document.addEventListener('mouseup', (e) => {
     }
 });
 
-// Animation Loop
 function animate() {
     requestAnimationFrame(animate);
 
@@ -381,7 +380,6 @@ function animate() {
     renderer.render(scene, camera);
 }
 
-// Safely execute init after DOM loads
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initGame);
 } else {
