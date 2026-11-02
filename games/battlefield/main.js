@@ -7,10 +7,9 @@ let controls;
 let isScoped = false;
 let gunGroup;
 
-let currentWeapon = 'M16'; // Can be 'M16' or 'Bat'
+let currentWeapon = 'M16';
 let selectedMap = 'city';
 let selectedMode = 'solo';
-let graphicsPreset = 'high';
 
 let ammoInMag = 30;
 let reserveAmmo = 90;
@@ -18,7 +17,7 @@ let isReloading = false;
 let health = 100;
 
 const enemies = [];
-const lootCakes = [];
+const lootCrates = [];
 const environmentObjects = [];
 let dirLight, ambientLight;
 let prevTime = performance.now();
@@ -42,8 +41,8 @@ function playSound(type) {
         osc.stop(audioCtx.currentTime + 0.1);
     } else if (type === 'enemy_shot') {
         osc.type = 'square';
-        osc.frequency.setValueAtTime(220, audioCtx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(60, audioCtx.currentTime + 0.08);
+        osc.frequency.setValueAtTime(240, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.08);
         gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
         osc.start();
@@ -102,10 +101,10 @@ function initGame() {
 
     initSkyAndMoon();
     updateWeaponMesh();
-    buildEnvironment(selectedMap);
+    buildEnvironment();
     controls = initFirstPersonControls(camera, environmentObjects);
 
-    for (let i = 0; i < 6; i++) spawnCombatSoldier();
+    for (let i = 0; i < 7; i++) spawnTacticalSoldier();
 
     setupMenuUI();
     initCharacterPreview();
@@ -149,11 +148,11 @@ function updateWeaponMesh() {
     scene.add(camera);
 }
 
-function spawnCombatSoldier() {
+function spawnTacticalSoldier() {
     const group = new THREE.Group();
     const isFemale = Math.random() > 0.5;
 
-    const suitMat = new THREE.MeshStandardMaterial({ color: isFemale ? 0x3b2f2f : 0x1c2430, roughness: 0.7 });
+    const suitMat = new THREE.MeshStandardMaterial({ color: isFemale ? 0x472d42 : 0x1e293b, roughness: 0.7 });
     const armorMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.6 });
 
     const torsoWidth = isFemale ? 0.22 : 0.28;
@@ -169,10 +168,15 @@ function spawnCombatSoldier() {
     const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2), armorMat);
     helmet.position.y = 1.78;
 
-    // Enemy Rifle held in hands
-    const rifleMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.8 });
-    const rifle = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.1, 0.7), rifleMat);
-    rifle.position.set(torsoWidth + 0.1, 1.1, -0.3);
+    // CLEARLY VISIBLE ASSAULT RIFLE HELD BY SOLDIER
+    const rifleGroup = new THREE.Group();
+    const rifleBody = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.1, 0.8), new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.9 }));
+    const rifleBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.5), new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.8 }));
+    rifleBarrel.rotation.x = Math.PI / 2;
+    rifleBarrel.position.set(0, 0, -0.6);
+    rifleGroup.add(rifleBody, rifleBarrel);
+    rifleGroup.position.set(torsoWidth + 0.12, 1.15, -0.3);
+    group.add(rifleGroup);
 
     const leftArm = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.65, 8), suitMat);
     leftArm.position.set(-(torsoWidth + 0.08), 1.35, 0);
@@ -186,16 +190,17 @@ function spawnCombatSoldier() {
     const rightLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.06, 0.7, 8), suitMat);
     rightLeg.position.set(0.12, 0.7, 0);
 
-    group.add(torso, vest, head, helmet, rifle, leftArm, rightArm, leftLeg, rightLeg);
+    group.add(torso, vest, head, helmet, leftArm, rightArm, leftLeg, rightLeg);
 
     const angle = Math.random() * Math.PI * 2;
-    const dist = 35 + Math.random() * 40;
+    const dist = 30 + Math.random() * 45;
     group.position.set(Math.cos(angle) * dist, 0, Math.sin(angle) * dist);
 
     group.userData = {
         health: 100,
-        speed: isFemale ? 3.2 : 2.6,
-        lastShotTime: 0
+        speed: isFemale ? 4.0 : 3.4,
+        lastShotTime: 0,
+        idealRange: 16 + Math.random() * 8 // Tactical holding distance
     };
 
     scene.add(group);
@@ -204,14 +209,12 @@ function spawnCombatSoldier() {
 
 function spawnLootCrate(pos) {
     const crateGeo = new THREE.BoxGeometry(0.6, 0.4, 0.6);
-    const crateMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0xd97706, emissiveIntensity: 0.5 });
+    const crateMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0xd97706, emissiveIntensity: 0.6 });
     const crate = new THREE.Mesh(crateGeo, crateMat);
     crate.position.set(pos.x, 0.2, pos.z);
     crate.castShadow = true;
-
-    crate.userData = { isLoot: true };
     scene.add(crate);
-    lootCakes.push(crate);
+    lootCrates.push(crate);
 }
 
 function reloadWeapon() {
@@ -232,7 +235,7 @@ function reloadWeapon() {
     }, 1500);
 }
 
-function buildEnvironment(mapType) {
+function buildEnvironment() {
     environmentObjects.forEach(obj => scene.remove(obj));
     environmentObjects.length = 0;
 
@@ -275,6 +278,12 @@ function buildEnvironment(mapType) {
             const door = new THREE.Mesh(new THREE.BoxGeometry(2.2, 3.5, 0.4), doorMat);
             door.position.set(0, 1.75, 7.05);
             bGroup.add(door);
+
+            for (let wy = 5; wy < height - 2; wy += 4) {
+                const win = new THREE.Mesh(new THREE.BoxGeometry(1.5, 2, 0.2), windowMat);
+                win.position.set(0, wy, 7.05);
+                bGroup.add(win);
+            }
 
             bGroup.position.set(x, 0, z);
             scene.add(bGroup);
@@ -370,13 +379,12 @@ function performAction() {
                 scene.remove(hitObj);
                 const idx = enemies.indexOf(hitObj);
                 if (idx > -1) enemies.splice(idx, 1);
-                setTimeout(spawnCombatSoldier, 3500);
+                setTimeout(spawnTacticalSoldier, 4000);
             }
         }
     }
 }
 
-// Keybindings for Reload ('R') and Weapons ('1', '2')
 document.addEventListener('keydown', (e) => {
     if (document.pointerLockElement !== document.body) return;
     if (e.code === 'KeyR') {
@@ -407,13 +415,13 @@ function animate() {
     updateCompassAndElevation();
 
     // Check Loot pickups
-    for (let i = lootCakes.length - 1; i >= 0; i--) {
-        const crate = lootCakes[i];
+    for (let i = lootCrates.length - 1; i >= 0; i--) {
+        const crate = lootCrates[i];
         if (camera.position.distanceTo(crate.position) < 2.0) {
             reserveAmmo += 30;
             playSound('loot');
             scene.remove(crate);
-            lootCakes.splice(i, 1);
+            lootCrates.splice(i, 1);
             const ammoDisplay = document.getElementById('ammo-val');
             if (ammoDisplay && !isReloading) {
                 ammoDisplay.innerText = `${ammoInMag} / ${reserveAmmo} (M16)`;
@@ -421,28 +429,38 @@ function animate() {
         }
     }
 
-    // Update Enemy Combat Team AI
+    // TACTICAL COMBAT SQUAD AI (Hold positions, take cover, and fire from range)
     for (let i = 0; i < enemies.length; i++) {
         const enemy = enemies[i];
         const distToPlayer = enemy.position.distanceTo(camera.position);
 
-        if (distToPlayer > 8.0) {
+        enemy.lookAt(camera.position.x, enemy.position.y, camera.position.z);
+
+        // Maintain tactical standoff distance (ideal combat range)
+        if (distToPlayer > enemy.userData.idealRange + 3) {
+            // Move closer to take position
             const dir = new THREE.Vector3().subVectors(camera.position, enemy.position);
             dir.y = 0;
             dir.normalize();
             enemy.position.addScaledVector(dir, enemy.userData.speed * delta);
-        } else {
-            // Combat shooting back at player
-            if (time - enemy.userData.lastShotTime > 1800) {
+        } else if (distToPlayer < enemy.userData.idealRange - 3) {
+            // Back up to maintain firing distance
+            const dir = new THREE.Vector3().subVectors(enemy.position, camera.position);
+            dir.y = 0;
+            dir.normalize();
+            enemy.position.addScaledVector(dir, enemy.userData.speed * 0.7 * delta);
+        }
+
+        // Firing from position
+        if (distToPlayer <= 25) {
+            if (time - enemy.userData.lastShotTime > 1500) {
                 enemy.userData.lastShotTime = time;
                 playSound('enemy_shot');
-                health = Math.max(0, health - 12);
+                health = Math.max(0, health - 10);
                 document.getElementById('health-val').innerText = Math.floor(health);
                 playSound('damage');
             }
         }
-
-        enemy.lookAt(camera.position.x, 0, camera.position.z);
     }
 
     prevTime = time;
