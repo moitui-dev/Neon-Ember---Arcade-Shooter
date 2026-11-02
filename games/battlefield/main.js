@@ -168,14 +168,17 @@ function spawnTacticalSoldier() {
     const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2), armorMat);
     helmet.position.y = 1.78;
 
-    // CLEARLY VISIBLE ASSAULT RIFLE HELD BY SOLDIER
+    // DETAILED 3D ASSAULT RIFLE HELD BY THE SOLDIER
     const rifleGroup = new THREE.Group();
-    const rifleBody = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.1, 0.8), new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.9 }));
-    const rifleBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.5), new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.8 }));
+    const rifleBody = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 0.75), new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.9 }));
+    const rifleBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.6), new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.8 }));
     rifleBarrel.rotation.x = Math.PI / 2;
     rifleBarrel.position.set(0, 0, -0.6);
-    rifleGroup.add(rifleBody, rifleBarrel);
-    rifleGroup.position.set(torsoWidth + 0.12, 1.15, -0.3);
+    const rifleMag = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.15, 0.08), new THREE.MeshStandardMaterial({ color: 0x444444 }));
+    rifleMag.position.set(0, -0.12, -0.1);
+
+    rifleGroup.add(rifleBody, rifleBarrel, rifleMag);
+    rifleGroup.position.set(torsoWidth + 0.14, 1.15, -0.35);
     group.add(rifleGroup);
 
     const leftArm = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.65, 8), suitMat);
@@ -200,7 +203,7 @@ function spawnTacticalSoldier() {
         health: 100,
         speed: isFemale ? 4.0 : 3.4,
         lastShotTime: 0,
-        idealRange: 16 + Math.random() * 8 // Tactical holding distance
+        idealRange: 16 + Math.random() * 8
     };
 
     scene.add(group);
@@ -208,13 +211,23 @@ function spawnTacticalSoldier() {
 }
 
 function spawnLootCrate(pos) {
-    const crateGeo = new THREE.BoxGeometry(0.6, 0.4, 0.6);
-    const crateMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0xd97706, emissiveIntensity: 0.6 });
-    const crate = new THREE.Mesh(crateGeo, crateMat);
-    crate.position.set(pos.x, 0.2, pos.z);
-    crate.castShadow = true;
-    scene.add(crate);
-    lootCrates.push(crate);
+    const crateGroup = new THREE.Group();
+
+    // Physical 3D Ammo Crate model
+    const boxMat = new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.5, metalness: 0.3 });
+    const latchMat = new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.8 });
+
+    const box = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.35, 0.4), boxMat);
+    box.castShadow = true;
+
+    const latch = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.05), latchMat);
+    latch.position.set(0, 0.05, 0.2);
+
+    crateGroup.add(box, latch);
+    crateGroup.position.set(pos.x, 0.18, pos.z);
+
+    scene.add(crateGroup);
+    lootCrates.push(crateGroup);
 }
 
 function reloadWeapon() {
@@ -349,7 +362,11 @@ function updateCompassAndElevation() {
 
 function performAction() {
     if (currentWeapon === 'M16') {
-        if (isReloading || ammoInMag <= 0) return;
+        if (isReloading) return;
+        if (ammoInMag <= 0) {
+            reloadWeapon();
+            return;
+        }
         ammoInMag--;
         document.getElementById('ammo-val').innerText = `${ammoInMag} / ${reserveAmmo} (M16)`;
         playSound('shot');
@@ -429,29 +446,25 @@ function animate() {
         }
     }
 
-    // TACTICAL COMBAT SQUAD AI (Hold positions, take cover, and fire from range)
+    // TACTICAL COMBAT SQUAD AI
     for (let i = 0; i < enemies.length; i++) {
         const enemy = enemies[i];
         const distToPlayer = enemy.position.distanceTo(camera.position);
 
         enemy.lookAt(camera.position.x, enemy.position.y, camera.position.z);
 
-        // Maintain tactical standoff distance (ideal combat range)
         if (distToPlayer > enemy.userData.idealRange + 3) {
-            // Move closer to take position
             const dir = new THREE.Vector3().subVectors(camera.position, enemy.position);
             dir.y = 0;
             dir.normalize();
             enemy.position.addScaledVector(dir, enemy.userData.speed * delta);
         } else if (distToPlayer < enemy.userData.idealRange - 3) {
-            // Back up to maintain firing distance
             const dir = new THREE.Vector3().subVectors(enemy.position, camera.position);
             dir.y = 0;
             dir.normalize();
             enemy.position.addScaledVector(dir, enemy.userData.speed * 0.7 * delta);
         }
 
-        // Firing from position
         if (distToPlayer <= 25) {
             if (time - enemy.userData.lastShotTime > 1500) {
                 enemy.userData.lastShotTime = time;
