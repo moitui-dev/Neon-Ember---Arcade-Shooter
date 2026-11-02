@@ -5,22 +5,137 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Omni Gaming Network - 3D Battlefield</title>
     <style>
+        :root {
+            --bg-primary: #120d16;
+            --bg-secondary: #1e1526;
+            --accent-burgundy: #581c87;
+            --accent-glow: #9333ea;
+            --text-main: #f3e8ff;
+            --text-muted: #c084fc;
+            --border-color: #3b204e;
+        }
+
         body, html {
             margin: 0;
             padding: 0;
             width: 100%;
             height: 100%;
             overflow: hidden;
-            background-color: #0f0f13;
-            font-family: monospace;
+            background-color: var(--bg-primary);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text-main);
         }
+
         #game-canvas-container {
             width: 100%;
             height: 100%;
             position: absolute;
             top: 0;
             left: 0;
+            z-index: 1;
         }
+
+        /* Tactical Main Menu / Lobby Overlay */
+        #lobby-menu {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(18, 13, 22, 0.95), rgba(30, 21, 38, 0.95));
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .lobby-card {
+            background: var(--bg-secondary);
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            padding: 30px 40px;
+            width: 600px;
+            max-width: 90%;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6);
+            text-align: center;
+        }
+
+        h1 {
+            margin-top: 0;
+            color: #e9d5ff;
+            font-size: 2rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            text-shadow: 0 0 10px rgba(147, 51, 234, 0.5);
+        }
+
+        .section-group {
+            margin: 20px 0;
+            text-align: left;
+        }
+
+        .section-group label {
+            display: block;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .options-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .option-btn {
+            background: #171021;
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+
+        .option-btn:hover {
+            background: var(--accent-burgundy);
+            border-color: var(--accent-glow);
+        }
+
+        .option-btn.active {
+            background: var(--accent-glow);
+            border-color: #ffffff;
+            box-shadow: 0 0 10px rgba(147, 51, 234, 0.8);
+        }
+
+        .launch-btn {
+            background: linear-gradient(135deg, #7e22ce, #581c87);
+            border: 1px solid #a855f7;
+            color: white;
+            width: 100%;
+            padding: 14px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 15px;
+            transition: transform 0.1s ease, box-shadow 0.2s ease;
+        }
+
+        .launch-btn:hover {
+            box-shadow: 0 0 20px rgba(168, 85, 247, 0.6);
+            transform: translateY(-2px);
+        }
+
+        /* In-Game HUD */
         #ui-overlay {
             position: absolute;
             top: 0;
@@ -33,43 +148,53 @@
             justify-content: space-between;
             padding: 20px;
             box-sizing: border-box;
-            color: #ffffff;
+            z-index: 5;
         }
+
         .hud-panel {
-            background: rgba(15, 15, 19, 0.7);
-            border: 1px solid #333344;
+            background: rgba(18, 13, 22, 0.85);
+            border: 1px solid var(--border-color);
             padding: 10px 15px;
-            border-radius: 4px;
+            border-radius: 6px;
+            backdrop-filter: blur(5px);
+            font-weight: 600;
+            font-size: 0.9rem;
         }
+
         #crosshair {
             position: absolute;
             top: 50%;
             left: 50%;
             width: 8px;
             height: 8px;
-            background-color: rgba(0, 255, 128, 0.8);
+            background-color: rgba(168, 85, 247, 0.9);
             border-radius: 50%;
             transform: translate(-50%, -50%);
+            z-index: 5;
         }
+
         #scope-overlay {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: radial-gradient(circle, rgba(0,0,0,0) 30%, rgba(0,0,0,0.95) 70%);
+            background: radial-gradient(circle, rgba(0,0,0,0) 25%, rgba(10, 5, 15, 0.96) 65%);
             display: flex;
             justify-content: center;
             align-items: center;
             pointer-events: none;
+            z-index: 6;
         }
+
         #scope-crosshair {
-            width: 100px;
-            height: 100px;
-            border: 2px solid #00ff00;
+            width: 120px;
+            height: 120px;
+            border: 2px solid #a855f7;
             border-radius: 50%;
             position: relative;
         }
+
         #scope-crosshair::before {
             content: '';
             position: absolute;
@@ -77,8 +202,9 @@
             left: 0;
             width: 100%;
             height: 2px;
-            background: #00ff00;
+            background: #a855f7;
         }
+
         #scope-crosshair::after {
             content: '';
             position: absolute;
@@ -86,49 +212,68 @@
             left: 49%;
             width: 2px;
             height: 100%;
-            background: #00ff00;
+            background: #a855f7;
         }
+
         .hidden { display: none !important; }
-        #instructions {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(20, 20, 28, 0.9);
-            border: 1px solid #555577;
-            padding: 30px;
-            text-align: center;
-            border-radius: 8px;
-            pointer-events: auto;
-            cursor: pointer;
-        }
     </style>
 </head>
 <body>
 
-<div id="game-canvas-container"></div>
+<!-- Pre-Game Tactical Lobby & Menu -->
+<div id="lobby-menu">
+    <div class="lobby-card">
+        <h1>Omni Tactical 3D</h1>
+        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px;">Configure deployment parameters before entering combat zone.</p>
 
-<div id="ui-overlay">
-    <div style="display: flex; justify-content: space-between;">
-        <div class="hud-panel">HEALTH: <span id="health-val">100</span>%</div>
-        <div class="hud-panel">OBJECTIVE: SURVIVE & ELIMINATE</div>
-        <div class="hud-panel">AMMO: 30 / 90 (M16)</div>
-    </div>
-    <div style="display: flex; justify-content: space-between;">
-        <div class="hud-panel">CONTROLS: WASD = Move | Mouse = Look | Left-Click = Shoot | Right-Click = Scope | G = Grenade</div>
-        <div class="hud-panel"><a href="../../index.html" style="color: #00ff88; text-decoration: none;">EXIT TO HUB</a></div>
+        <div class="section-group">
+            <label>Select Map Ground</label>
+            <div class="options-grid" id="map-selector">
+                <button class="option-btn active" data-map="city">City Ruins</button>
+                <button class="option-btn" data-map="forest">Dense Forest</button>
+                <button class="option-btn" data-map="bunker">Desert Bunker</button>
+            </div>
+        </div>
+
+        <div class="section-group">
+            <label>Combat Game Mode</label>
+            <div class="options-grid" id="mode-selector">
+                <button class="option-btn active" data-mode="solo">Solo Survival</button>
+                <button class="option-btn" data-mode="zombie">Zombie Wave</button>
+                <button class="option-btn" data-mode="multiplayer">Online Lobby</button>
+            </div>
+        </div>
+
+        <div class="section-group">
+            <label>Graphics & Performance</label>
+            <div class="options-grid" id="graphics-selector">
+                <button class="option-btn active" data-gfx="high">High Visuals</button>
+                <button class="option-btn" data-gfx="performance">Max FPS</button>
+            </div>
+        </div>
+
+        <button class="launch-btn" id="start-deployment-btn">Deploy to Battlefield</button>
     </div>
 </div>
 
-<div id="crosshair"></div>
+<div id="game-canvas-container"></div>
+
+<div id="ui-overlay" class="hidden">
+    <div style="display: flex; justify-content: space-between;">
+        <div class="hud-panel">HEALTH: <span id="health-val">100</span>%</div>
+        <div class="hud-panel" id="hud-mode">MODE: SOLO SURVIVAL</div>
+        <div class="hud-panel">AMMO: <span id="ammo-val">30 / 90 (M16)</span></div>
+    </div>
+    <div style="display: flex; justify-content: space-between;">
+        <div class="hud-panel">CONTROLS: WASD = Move | Mouse = Look | Left-Click = Shoot | Right-Click = Scope | 1/2 = Weapon | G = Grenade</div>
+        <div class="hud-panel"><a href="../../index.html" style="color: #c084fc; text-decoration: none;">EXIT TO HUB</a></div>
+    </div>
+</div>
+
+<div id="crosshair" class="hidden"></div>
 
 <div id="scope-overlay" class="hidden">
     <div id="scope-crosshair"></div>
-</div>
-
-<div id="instructions">
-    <h2>3D BATTLEFIELD ARENA</h2>
-    <p>Click anywhere to capture mouse and start combat.</p>
 </div>
 
 <script type="importmap">
@@ -139,6 +284,6 @@
     }
 </script>
 
-<script type="module" src="./game.js"></script>
+<script type="module" src="./main.js"></script>
 </body>
 </html>
