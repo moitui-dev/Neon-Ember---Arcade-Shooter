@@ -36,7 +36,7 @@ const lootCrates = [];
 const floatingTexts = [];
 const debrisObjects = [];
 const environmentObjects = [];
-let dirLight, ambientLight, cloudsGroup;
+let dirLight, ambientLight;
 let miniMapCtx, miniMapCanvas;
 let prevTime = performance.now();
 
@@ -108,7 +108,7 @@ function initGame() {
     updateLightingAndSky();
 
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 1.6, 150);
+    camera.position.set(0, 1.6, 120);
 
     renderer = new THREE.WebGLRenderer({ antialias: graphicsQuality === 'high', powerPreference: "high-performance" });
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -356,12 +356,12 @@ function buildEnvironment(mapType) {
     environmentObjects.forEach(obj => scene.remove(obj));
     environmentObjects.length = 0;
 
-    // Properly positioned ocean stretching out from z = 30 to z = 400 with wave color
-    const oceanGeo = new THREE.PlaneGeometry(600, 400);
+    // Confined shoreline ocean strip in the foreground approach (Z: 60 to 180)
+    const oceanGeo = new THREE.PlaneGeometry(360, 120);
     const oceanMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.2, metalness: 0.6 });
     const ocean = new THREE.Mesh(oceanGeo, oceanMat);
     ocean.rotation.x = -Math.PI / 2;
-    ocean.position.set(0, 0.05, 200);
+    ocean.position.set(0, -0.05, 120);
     scene.add(ocean);
     environmentObjects.push(ocean);
 
@@ -371,7 +371,7 @@ function buildEnvironment(mapType) {
         const floor = new THREE.Mesh(floorGeo, floorMat);
         floor.rotation.x = -Math.PI / 2;
         floor.receiveShadow = true;
-        floor.position.set(0, 0, -20);
+        floor.position.set(0, 0, -40);
         scene.add(floor);
         environmentObjects.push(floor);
 
@@ -379,7 +379,7 @@ function buildEnvironment(mapType) {
         for (let pos of [-50, 0, 50]) {
             const road = new THREE.Mesh(new THREE.PlaneGeometry(14, 360), tarmacMat);
             road.rotation.x = -Math.PI / 2;
-            road.position.set(pos, 0.02, -20);
+            road.position.set(pos, 0.02, -40);
             scene.add(road);
             environmentObjects.push(road);
         }
@@ -397,7 +397,7 @@ function buildEnvironment(mapType) {
                 if (Math.abs(x) < 18 || Math.abs(z) < 18) continue;
                 const height = 16 + Math.random() * 8;
                 const mainBox = new THREE.Mesh(new THREE.BoxGeometry(14, height, 14), bWallMat);
-                mainBox.position.set(x, height / 2, z);
+                mainBox.position.set(x, height / 2, z - 40);
                 scene.add(mainBox);
                 environmentObjects.push(mainBox);
             }
@@ -534,7 +534,7 @@ function createHUDOverlays() {
         isGameStarted = true;
         isCinematicIntro = true;
         introProgress = 0;
-        camera.position.set(0, 2.0, 150);
+        camera.position.set(0, 1.6, 150);
         document.getElementById('health-val').innerText = '100';
         document.getElementById('ammo-val').innerText = `${ammoInMag} / ${reserveAmmo} (M16)`;
         overlay.classList.add('hidden');
@@ -552,7 +552,7 @@ function setupLobbyUI() {
             introProgress = 0;
             isGameOver = false;
             health = 100;
-            camera.position.set(0, 2.0, 150); // Start cinematic camera out in the water
+            camera.position.set(0, 1.6, 160); // Start cinematic camera in the shore ocean
 
             document.getElementById('health-val').innerText = '100';
             document.getElementById('lobby-menu').classList.add('hidden');
@@ -804,15 +804,15 @@ function animate() {
     const delta = (time - prevTime) / 1000;
 
     if (isGameStarted && !isGameOver) {
-        // CINEMATIC SEA-SWIM INFILTRATION INTRO
+        // CINEMATIC SEA-SWIM INFILTRATION INTRO (Swims from Z: 160 down to Z: 20 onto land)
         if (isCinematicIntro) {
-            introProgress += delta * 15; // Swim speed towards shore
-            camera.position.z = Math.max(0, 150 - introProgress);
-            // Gentle wave bobbing motion
-            camera.position.y = 1.6 + Math.sin(introProgress * 0.4) * 0.25;
+            introProgress += delta * 18;
+            camera.position.z = Math.max(20, 160 - introProgress);
+            camera.position.y = 1.4 + Math.sin(introProgress * 0.5) * 0.2; // Realistic wave bobbing
 
-            if (camera.position.z <= 0) {
+            if (camera.position.z <= 20) {
                 isCinematicIntro = false;
+                camera.position.y = 1.6; // Step onto land
                 document.body.requestPointerLock();
             }
         } else {
