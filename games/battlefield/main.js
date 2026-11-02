@@ -14,7 +14,6 @@ let currentWeapon = 'M16';
 let selectedMap = 'city';
 let selectedMode = 'solo';
 let graphicsPreset = 'high';
-let dayCycle = 'day';
 let ammoCount = 30;
 let health = 100;
 
@@ -22,49 +21,68 @@ const enemies = [];
 const environmentObjects = [];
 let dirLight, ambientLight;
 
-const container = document.getElementById('game-canvas-container');
+function initGame() {
+    const container = document.getElementById('game-canvas-container');
+    if (!container) return;
 
-// 1. Initialize Core 3D Engine & Background World
-scene = new THREE.Scene();
-scene.background = new THREE.Color(0x120d16);
-scene.fog = new THREE.FogExp2(0x120d16, 0.015);
+    // 1. Core 3D Engine Setup
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x120d16);
+    scene.fog = new THREE.FogExp2(0x120d16, 0.015);
 
-camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.set(0, 1.6, 15);
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 1.6, 15);
 
-renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(window.devicePixelRatio);
-renderer.shadowMap.enabled = true;
-container.appendChild(renderer.domElement);
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.shadowMap.enabled = true;
+    container.appendChild(renderer.domElement);
 
-// Lighting
-ambientLight = new THREE.AmbientLight(0xd8b4fe, 0.6);
-scene.add(ambientLight);
+    // Lighting
+    ambientLight = new THREE.AmbientLight(0xd8b4fe, 0.6);
+    scene.add(ambientLight);
 
-dirLight = new THREE.DirectionalLight(0xf3e8ff, 1.0);
-dirLight.position.set(40, 80, 40);
-dirLight.castShadow = true;
-scene.add(dirLight);
+    dirLight = new THREE.DirectionalLight(0xf3e8ff, 1.0);
+    dirLight.position.set(40, 80, 40);
+    dirLight.castShadow = true;
+    scene.add(dirLight);
 
-// Ground & Grid Arena
-const floorGeo = new THREE.PlaneGeometry(300, 300, 64, 64);
-const floorMat = new THREE.MeshStandardMaterial({
-    color: 0x181020,
-    roughness: 0.8,
-    metalness: 0.2,
-    side: THREE.DoubleSide
-});
-const floor = new THREE.Mesh(floorGeo, floorMat);
-floor.rotation.x = -Math.PI / 2;
-floor.receiveShadow = true;
-scene.add(floor);
+    // Ground Grid Arena
+    const floorGeo = new THREE.PlaneGeometry(300, 300, 64, 64);
+    const floorMat = new THREE.MeshStandardMaterial({
+        color: 0x181020,
+        roughness: 0.8,
+        metalness: 0.2,
+        side: THREE.DoubleSide
+    });
+    const floor = new THREE.Mesh(floorGeo, floorMat);
+    floor.rotation.x = -Math.PI / 2;
+    floor.receiveShadow = true;
+    scene.add(floor);
 
-const gridHelper = new THREE.GridHelper(300, 60, 0x9333ea, 0x3b204e);
-gridHelper.position.y = 0.01;
-scene.add(gridHelper);
+    const gridHelper = new THREE.GridHelper(300, 60, 0x9333ea, 0x3b204e);
+    gridHelper.position.y = 0.01;
+    scene.add(gridHelper);
 
-// 2. Character & Weapon Preview in Menu Sidebar
+    // 2. Loadout Preview Box Rendering
+    initCharacterPreview();
+
+    // 3. Attach Menu Button Listeners (Guaranteed DOM Ready)
+    setupMenuUI();
+
+    // 4. Controls & Animation Loop
+    initControls(camera, (state) => {
+        moveForward = state.moveForward;
+        moveBackward = state.moveBackward;
+        moveLeft = state.moveLeft;
+        moveRight = state.moveRight;
+    });
+
+    animate();
+}
+
+// Sidebar Character Preview Setup
 function initCharacterPreview() {
     const previewContainer = document.getElementById('character-preview-container');
     if (!previewContainer) return;
@@ -82,7 +100,6 @@ function initCharacterPreview() {
     pLight.position.set(2, 4, 2);
     pScene.add(pLight, new THREE.AmbientLight(0xffffff, 0.5));
 
-    // Static Character Model Preview
     const charGroup = new THREE.Group();
     const torso = new THREE.Mesh(
         new THREE.CylinderGeometry(0.35, 0.3, 1.2, 16),
@@ -95,7 +112,6 @@ function initCharacterPreview() {
     );
     head.position.y = 1.35;
 
-    // Rifle Preview
     const rifle = new THREE.Mesh(
         new THREE.BoxGeometry(0.1, 0.1, 1.0),
         new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.8 })
@@ -107,19 +123,73 @@ function initCharacterPreview() {
 
     function animatePreview() {
         requestAnimationFrame(animatePreview);
-        charGroup.rotation.y += 0.01; // Gentle rotation
+        charGroup.rotation.y += 0.01;
         pRenderer.render(pScene, pCamera);
     }
     animatePreview();
 }
-initCharacterPreview();
 
-// 3. Environment & Map Builder
+// Menu UI Interactivity & Deployment Trigger
+function setupMenuUI() {
+    // Map Selection
+    document.querySelectorAll('#map-selector .option-btn').forEach(btn => {
+        btn.onclick = (e) => {
+            document.querySelectorAll('#map-selector .option-btn').forEach(b => b.classList.remove('active'));
+            e.currentTarget.classList.add('active');
+            selectedMap = e.currentTarget.dataset.map;
+        };
+    });
+
+    // Game Mode Selection
+    document.querySelectorAll('#mode-selector .option-btn').forEach(btn => {
+        btn.onclick = (e) => {
+            document.querySelectorAll('#mode-selector .option-btn').forEach(b => b.classList.remove('active'));
+            e.currentTarget.classList.add('active');
+            selectedMode = e.currentTarget.dataset.mode;
+        };
+    });
+
+    // Graphics Quality Selection
+    document.querySelectorAll('#graphics-selector .option-btn').forEach(btn => {
+        btn.onclick = (e) => {
+            document.querySelectorAll('#graphics-selector .option-btn').forEach(b => b.classList.remove('active'));
+            e.currentTarget.classList.add('active');
+            graphicsPreset = e.currentTarget.dataset.gfx;
+        };
+    });
+
+    // Deploy Button Action
+    const deployBtn = document.getElementById('start-deployment-btn');
+    if (deployBtn) {
+        deployBtn.onclick = () => {
+            document.getElementById('lobby-menu').classList.add('hidden');
+            document.getElementById('ui-overlay').classList.remove('hidden');
+            document.getElementById('crosshair').classList.remove('hidden');
+            document.getElementById('hud-mode').innerText = `MODE: ${selectedMode.toUpperCase()}`;
+
+            if (graphicsPreset === 'performance') {
+                renderer.shadowMap.enabled = false;
+                renderer.setPixelRatio(1);
+            } else {
+                renderer.shadowMap.enabled = true;
+                renderer.setPixelRatio(window.devicePixelRatio);
+            }
+
+            buildEnvironment(selectedMap);
+            for (let i = 0; i < 6; i++) spawnEnemy('zombie');
+
+            document.body.requestPointerLock();
+            initVoiceChat();
+        };
+    }
+}
+
+// Build Selected Map Environment
 function buildEnvironment(mapType) {
     environmentObjects.forEach(obj => scene.remove(obj));
     environmentObjects.length = 0;
 
-    if (mapType === 'city') {
+    if (mapType === 'city' || mapType === 'bunker') {
         const boxGeo = new THREE.BoxGeometry(4, 6, 4);
         const boxMat = new THREE.MeshStandardMaterial({ color: 0x2e1a47, roughness: 0.5 });
         for (let i = 0; i < 25; i++) {
@@ -150,7 +220,7 @@ function buildEnvironment(mapType) {
     }
 }
 
-// Enemy AI Spawner
+// Enemy Spawner
 function spawnEnemy(type = 'zombie') {
     const group = new THREE.Group();
     const bodyGeo = new THREE.CylinderGeometry(0.4, 0.4, 1.6);
@@ -174,62 +244,7 @@ function spawnEnemy(type = 'zombie') {
     enemies.push(group);
 }
 
-// Menu Option Click Listeners (Guaranteed clickable)
-document.querySelectorAll('#map-selector .option-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-        document.querySelectorAll('#map-selector .option-btn').forEach(b => b.classList.remove('active'));
-        e.target.classList.add('active');
-        selectedMap = e.target.dataset.map;
-    });
-});
-
-document.querySelectorAll('#mode-selector .option-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-        document.querySelectorAll('#mode-selector .option-btn').forEach(b => b.classList.remove('active'));
-        e.target.classList.add('active');
-        selectedMode = e.target.dataset.mode;
-    });
-});
-
-document.querySelectorAll('#graphics-selector .option-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-        document.querySelectorAll('#graphics-selector .option-btn').forEach(b => b.classList.remove('active'));
-        e.target.classList.add('active');
-        graphicsPreset = e.target.dataset.gfx;
-    });
-});
-
-// Launch Deployment Button
-document.getElementById('start-deployment-btn').addEventListener('click', () => {
-    document.getElementById('lobby-menu').classList.add('hidden');
-    document.getElementById('ui-overlay').classList.remove('hidden');
-    document.getElementById('crosshair').classList.remove('hidden');
-    document.getElementById('hud-mode').innerText = `MODE: ${selectedMode.toUpperCase()}`;
-
-    if (graphicsPreset === 'performance') {
-        renderer.shadowMap.enabled = false;
-        renderer.setPixelRatio(1);
-    } else {
-        renderer.shadowMap.enabled = true;
-        renderer.setPixelRatio(window.devicePixelRatio);
-    }
-
-    buildEnvironment(selectedMap);
-    for (let i = 0; i < 6; i++) spawnEnemy('zombie');
-
-    // Secure pointer lock activation
-    document.body.requestPointerLock();
-    initVoiceChat();
-});
-
-// Controls & Combat Mechanics
-initControls(camera, (state) => {
-    moveForward = state.moveForward;
-    moveBackward = state.moveBackward;
-    moveLeft = state.moveLeft;
-    moveRight = state.moveRight;
-});
-
+// In-Game Input Controls
 document.addEventListener('keydown', (e) => {
     if (e.code === 'Digit1') { currentWeapon = 'M16'; updateHUD(); }
     if (e.code === 'Digit2') { currentWeapon = 'PISTOL'; updateHUD(); }
@@ -237,11 +252,12 @@ document.addEventListener('keydown', (e) => {
 });
 
 function updateHUD() {
-    document.getElementById('ammo-val').innerText = `${ammoCount} / 90 (${currentWeapon})`;
-    document.getElementById('health-val').innerText = health;
+    const ammoElem = document.getElementById('ammo-val');
+    if (ammoElem) ammoElem.innerText = `${ammoCount} / 90 (${currentWeapon})`;
+    const healthElem = document.getElementById('health-val');
+    if (healthElem) healthElem.innerText = health;
 }
 
-// Shooting Mechanics
 function shootWeapon() {
     if (ammoCount <= 0) return;
     ammoCount--;
@@ -301,15 +317,15 @@ function throwGrenade() {
     }, 16);
 }
 
-// Mouse Clicks (ADS Scope & Firing)
+// Scope ADS & Shooting Mouse Handlers
 document.addEventListener('mousedown', (e) => {
     if (document.pointerLockElement !== document.body) return;
     if (e.button === 2) {
         isScoped = true;
         camera.fov = 25;
         camera.updateProjectionMatrix();
-        document.getElementById('scope-overlay').classList.remove('hidden');
-        document.getElementById('crosshair').classList.add('hidden');
+        document.getElementById('scope-overlay')?.classList.remove('hidden');
+        document.getElementById('crosshair')?.classList.add('hidden');
     } else if (e.button === 0) {
         shootWeapon();
     }
@@ -320,12 +336,12 @@ document.addEventListener('mouseup', (e) => {
         isScoped = false;
         camera.fov = 75;
         camera.updateProjectionMatrix();
-        document.getElementById('scope-overlay').classList.add('hidden');
-        document.getElementById('crosshair').classList.remove('hidden');
+        document.getElementById('scope-overlay')?.classList.add('hidden');
+        document.getElementById('crosshair')?.classList.remove('hidden');
     }
 });
 
-// Main Loop
+// Animation Loop
 function animate() {
     requestAnimationFrame(animate);
 
@@ -346,7 +362,6 @@ function animate() {
     camera.translateZ(velocity.z * delta);
     camera.position.y = 1.6;
 
-    // Zombie AI movement
     enemies.forEach((enemy) => {
         const playerPos = camera.position;
         const dirToPlayer = new THREE.Vector3().subVectors(playerPos, enemy.position);
@@ -366,9 +381,15 @@ function animate() {
     renderer.render(scene, camera);
 }
 
-animate();
+// Safely execute init after DOM loads
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initGame);
+} else {
+    initGame();
+}
 
 window.addEventListener('resize', () => {
+    if (!camera || !renderer) return;
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
