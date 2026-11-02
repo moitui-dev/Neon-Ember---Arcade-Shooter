@@ -7,7 +7,6 @@ let controls;
 let isScoped = false;
 let gunGroup;
 
-// Game State
 let currentWeapon = 'M16';
 let selectedMap = 'city';
 let selectedMode = 'solo';
@@ -20,7 +19,6 @@ const environmentObjects = [];
 let dirLight, ambientLight;
 let prevTime = performance.now();
 
-// Web Audio Synthesizer
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
 function playSound(type) {
@@ -260,7 +258,6 @@ function initCharacterPreview() {
 }
 
 function setupMenuUI() {
-    // Map Selection
     document.querySelectorAll('#map-selector .option-btn').forEach(btn => {
         btn.onclick = (e) => {
             document.querySelectorAll('#map-selector .option-btn').forEach(b => b.classList.remove('active'));
@@ -270,7 +267,6 @@ function setupMenuUI() {
         };
     });
 
-    // Game Mode Selection
     document.querySelectorAll('#mode-selector .option-btn').forEach(btn => {
         btn.onclick = (e) => {
             document.querySelectorAll('#mode-selector .option-btn').forEach(b => b.classList.remove('active'));
@@ -279,7 +275,6 @@ function setupMenuUI() {
         };
     });
 
-    // Graphics Quality Selection
     document.querySelectorAll('#graphics-selector .option-btn').forEach(btn => {
         btn.onclick = (e) => {
             document.querySelectorAll('#graphics-selector .option-btn').forEach(b => b.classList.remove('active'));
