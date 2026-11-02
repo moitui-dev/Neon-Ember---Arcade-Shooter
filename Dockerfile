@@ -1,4 +1,14 @@
-FROM ubuntu:latest
-LABEL authors="Moitui Beckham"
+# Use light, production-ready Nginx image
+FROM nginx:alpine
 
-ENTRYPOINT ["top", "-b"]
+# Remove default Nginx static files
+RUN rm -rf /usr/share/nginx/html/*
+
+# Copy full application codebase into Nginx web root
+COPY . /usr/share/nginx/html
+
+# Expose default HTTP port
+EXPOSE 80
+
+# Run Nginx in foreground
+CMD ["nginx", "-g", "daemon off;"]
