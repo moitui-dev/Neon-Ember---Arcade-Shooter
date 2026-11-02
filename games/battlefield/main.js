@@ -82,7 +82,7 @@ function initGame() {
     if (!container) return;
 
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x38bdf8); // Bright day sky
+    scene.background = new THREE.Color(0x38bdf8);
     scene.fog = new THREE.FogExp2(0x38bdf8, 0.003);
 
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -117,14 +117,12 @@ function initGame() {
 }
 
 function initDaySkyAndSun() {
-    // Bright Sun
     const sunGeo = new THREE.SphereGeometry(10, 24, 24);
     const sunMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
     const sun = new THREE.Mesh(sunGeo, sunMat);
     sun.position.set(100, 150, 50);
     scene.add(sun);
 
-    // Moving Clouds
     cloudsGroup = new THREE.Group();
     const cloudMat = new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, roughness: 1.0 });
     for (let i = 0; i < 20; i++) {
@@ -136,12 +134,11 @@ function initDaySkyAndSun() {
 }
 
 function initDebris() {
-    // Soda cans, papers, and leaves blown by wind on the tarmac
     const canMat = new THREE.MeshStandardMaterial({ color: 0xef4444, metalness: 0.8 });
     const paperMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.9 });
     const leafMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.9 });
 
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < 50; i++) {
         let mesh;
         const type = Math.random();
         if (type < 0.33) {
@@ -155,7 +152,8 @@ function initDebris() {
 
         mesh.position.set((Math.random() - 0.5) * 200, 0.1, (Math.random() - 0.5) * 200);
         mesh.userData = {
-            velocity: new THREE.Vector2((0.5 + Math.random() * 1.5), (Math.random() - 0.5) * 0.5)
+            velocity: new THREE.Vector2((2.5 + Math.random() * 2.0), (Math.random() - 0.5) * 0.8),
+            rotSpeed: Math.random() * 3
         };
         scene.add(mesh);
         debrisObjects.push(mesh);
@@ -211,13 +209,17 @@ function spawnTacticalSoldier() {
     const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2), armorMat);
     helmet.position.y = 1.78;
 
+    // FULLY VISIBLE ARMED ASSAULT RIFLE HELD BY SOLDIER
     const rifleGroup = new THREE.Group();
-    const rifleBody = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.15, 1.0), new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.9 }));
-    const rifleBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.8), new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.9 }));
+    const rifleBody = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.15, 1.1), new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.9 }));
+    const rifleBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.9), new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.9 }));
     rifleBarrel.rotation.x = Math.PI / 2;
-    rifleBarrel.position.set(0, 0, -0.7);
-    rifleGroup.add(rifleBody, rifleBarrel);
-    rifleGroup.position.set(0.15, 1.15, -0.4);
+    rifleBarrel.position.set(0, 0, -0.8);
+    const rifleStock = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.12, 0.35), new THREE.MeshStandardMaterial({ color: 0x332211 }));
+    rifleStock.position.set(0, 0, 0.6);
+
+    rifleGroup.add(rifleBody, rifleBarrel, rifleStock);
+    rifleGroup.position.set(0.2, 1.15, -0.4);
     group.add(rifleGroup);
 
     const leftArm = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.65, 8), suitMat);
@@ -240,8 +242,7 @@ function spawnTacticalSoldier() {
 
     group.userData = {
         health: 100,
-        maxHealth: 100,
-        speed: isFemale ? 4.0 : 3.4,
+        speed: isFemale ? 3.8 : 3.2,
         lastShotTime: 0,
         idealRange: 16 + Math.random() * 8
     };
@@ -256,13 +257,21 @@ function spawnFloatingText(pos, text, color = '#ef4444') {
     div.style.position = 'absolute';
     div.style.color = color;
     div.style.fontWeight = 'bold';
-    div.style.fontSize = '18px';
+    div.style.fontSize = '20px';
     div.style.textShadow = '0 0 4px #000';
     div.style.pointerEvents = 'none';
-    div.style.transition = 'transform 0.8s ease-out, opacity 0.8s ease-out';
     document.body.appendChild(div);
 
     floatingTexts.push({ element: div, position: pos.clone().add(new THREE.Vector3(0, 2.2, 0)), life: 1.0 });
+}
+
+function spawnHitEffect(pos) {
+    const sparkGeo = new THREE.SphereGeometry(0.15, 8, 8);
+    const sparkMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+    const spark = new THREE.Mesh(sparkGeo, sparkMat);
+    spark.position.copy(pos);
+    scene.add(spark);
+    setTimeout(() => scene.remove(spark), 120);
 }
 
 function spawnLootCrate(pos) {
@@ -481,6 +490,7 @@ function performAction() {
             const damageVal = currentWeapon === 'Bat' ? 60 : 35;
             hitObj.userData.health -= damageVal;
             playSound('hit');
+            spawnHitEffect(intersects[0].point);
             spawnFloatingText(hitObj.position, `-${damageVal}`);
 
             if (hitObj.userData.health <= 0) {
@@ -523,25 +533,26 @@ function animate() {
     if (!isGameOver && controls) controls.update(delta);
     updateCompassAndElevation();
 
-    // Move Clouds with wind
+    // Clouds movement
     if (cloudsGroup) {
-        cloudsGroup.position.x += delta * 1.5;
+        cloudsGroup.position.x += delta * 2.0;
         if (cloudsGroup.position.x > 200) cloudsGroup.position.x = -200;
     }
 
-    // Move Debris with wind
+    // Visible Wind Debris movement & rolling
     for (let debris of debrisObjects) {
         debris.position.x += debris.userData.velocity.x * delta;
         debris.position.z += debris.userData.velocity.y * delta;
+        debris.rotation.z += debris.userData.rotSpeed * delta;
         if (debris.position.x > 180) debris.position.x = -180;
         if (debris.position.z > 180) debris.position.z = -180;
     }
 
-    // Update Floating Text positions
+    // Floating text tracking
     for (let i = floatingTexts.length - 1; i >= 0; i--) {
         const ft = floatingTexts[i];
         ft.life -= delta;
-        ft.position.y += delta * 1.0;
+        ft.position.y += delta * 1.2;
 
         const vector = ft.position.clone();
         vector.project(camera);
@@ -573,7 +584,7 @@ function animate() {
         }
     }
 
-    // TACTICAL STANDOFF COMBAT SQUAD AI
+    // TACTICAL STANDOFF COMBAT SQUAD AI (Balanced damage and visible rifles)
     if (!isGameOver) {
         for (let i = 0; i < enemies.length; i++) {
             const enemy = enemies[i];
@@ -594,10 +605,10 @@ function animate() {
             }
 
             if (distToPlayer <= 25) {
-                if (time - enemy.userData.lastShotTime > 1500) {
+                if (time - enemy.userData.lastShotTime > 2200) { // Slower fire rate so you don't instantly die
                     enemy.userData.lastShotTime = time;
                     playSound('enemy_shot');
-                    health = Math.max(0, health - 10);
+                    health = Math.max(0, health - 8); // Balanced damage per hit
                     document.getElementById('health-val').innerText = Math.floor(health);
                     playSound('damage');
 
