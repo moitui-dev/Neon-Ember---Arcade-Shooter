@@ -60,9 +60,16 @@ function openLeaderboardModal() {
         });
     }
 
-    document.getElementById('leaderboard-modal').classList.add('active');
+    // Explicitly toggle display style to show modal
+    const modal = document.getElementById('leaderboard-modal');
+    if (modal) {
+        modal.style.display = 'flex';
+    }
 }
 
 function closeLeaderboardModal() {
-    document.getElementById('leaderboard-modal').classList.remove('active');
+    const modal = document.getElementById('leaderboard-modal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
 }
