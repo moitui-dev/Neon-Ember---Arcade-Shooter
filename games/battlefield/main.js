@@ -6,7 +6,7 @@ let scene, camera, renderer;
 let controls;
 let isScoped = false;
 let gunGroup;
-let fountainWaterColumn;
+let trafficLightMeshes = [];
 
 // Game State
 let currentWeapon = 'M16';
@@ -62,9 +62,10 @@ function initGame() {
     const container = document.getElementById('game-canvas-container');
     if (!container) return;
 
+    // Atmospheric Night Lighting Setup
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x1a1c23);
-    scene.fog = new THREE.FogExp2(0x1a1c23, 0.012);
+    scene.background = new THREE.Color(0x07090e);
+    scene.fog = new THREE.FogExp2(0x07090e, 0.018);
 
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     camera.position.set(0, 1.6, 10);
@@ -75,10 +76,10 @@ function initGame() {
     renderer.shadowMap.enabled = true;
     container.appendChild(renderer.domElement);
 
-    ambientLight = new THREE.AmbientLight(0xd4d8f0, 0.7);
+    ambientLight = new THREE.AmbientLight(0x1e293b, 0.35);
     scene.add(ambientLight);
 
-    dirLight = new THREE.DirectionalLight(0xfff8e7, 1.3);
+    dirLight = new THREE.DirectionalLight(0x38bdf8, 0.4); // Moonlight
     dirLight.position.set(50, 90, 40);
     dirLight.castShadow = true;
     scene.add(dirLight);
@@ -87,7 +88,7 @@ function initGame() {
     buildEnvironment(selectedMap);
     controls = initFirstPersonControls(camera, environmentObjects);
 
-    for (let i = 0; i < 6; i++) spawnHumanoidEnemy();
+    for (let i = 0; i < 6; i++) spawnArticulatedEnemy();
 
     setupMenuUI();
     initCharacterPreview();
@@ -97,7 +98,6 @@ function initGame() {
 // First-Person Gun Model
 function initFirstPersonWeapon() {
     gunGroup = new THREE.Group();
-
     const bodyMat = new THREE.MeshStandardMaterial({ color: 0x1e1b2e, metalness: 0.8, roughness: 0.3 });
     const receiver = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.12, 0.6), bodyMat);
     receiver.position.set(0.2, -0.22, -0.5);
@@ -114,56 +114,76 @@ function initFirstPersonWeapon() {
     scene.add(camera);
 }
 
-// Full Humanoid Enemy Spawner with Animated Limbs
-function spawnHumanoidEnemy() {
+// Highly Detailed Articulated Humanoid Enemy Spawner
+function spawnArticulatedEnemy() {
     const group = new THREE.Group();
 
-    const darkPurpleMat = new THREE.MeshStandardMaterial({ color: 0x581c87, roughness: 0.6 });
-    const lightPurpleMat = new THREE.MeshStandardMaterial({ color: 0xc084fc, roughness: 0.4 });
-    const darkLimbMat = new THREE.MeshStandardMaterial({ color: 0x3b0764 });
+    // Skin & Clothing Materials
+    const skinMat = new THREE.MeshStandardMaterial({ color: 0x86efac, roughness: 0.5 }); // Zombie greenish tint
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0xef4444 }); // Glowing red eyes
+    const hairMat = new THREE.MeshStandardMaterial({ color: 0x18181b }); // Dark hair
+    const shirtMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.7 }); // Tactical jacket
+    const pantsMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.8 }); // Combat trousers
+    const limbMat = new THREE.MeshStandardMaterial({ color: 0x334155 });
 
-    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.8, 0.35), darkPurpleMat);
+    // Torso & Neck
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.75, 0.3), shirtMat);
     torso.position.y = 1.1;
 
-    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 0.2), darkLimbMat);
-    neck.position.y = 1.6;
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.1, 0.18), skinMat);
+    neck.position.y = 1.55;
 
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.25, 16, 16), lightPurpleMat);
-    head.position.y = 1.85;
+    // Head with facial structure & glowing eyes
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.45, 0.4), skinMat);
+    head.position.y = 1.8;
 
+    const hair = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.15, 0.42), hairMat);
+    hair.position.y = 2.02;
+
+    const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.06, 0.05), eyeMat);
+    eyeL.position.set(-0.1, 1.85, 0.21);
+    const eyeR = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.06, 0.05), eyeMat);
+    eyeR.position.set(0.1, 1.85, 0.21);
+
+    // Articulated Arms with Fingers
     const leftArmGroup = new THREE.Group();
-    const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.7, 0.16), darkLimbMat);
-    leftArm.position.y = -0.35;
-    leftArmGroup.add(leftArm);
-    leftArmGroup.position.set(-0.4, 1.4, 0);
+    const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.65, 0.14), limbMat);
+    leftArm.position.y = -0.3;
+    const leftHand = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.15, 0.12), skinMat);
+    leftHand.position.set(0, -0.65, 0);
+    leftArmGroup.add(leftArm, leftHand);
+    leftArmGroup.position.set(-0.38, 1.35, 0);
 
     const rightArmGroup = new THREE.Group();
-    const rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.7, 0.16), darkLimbMat);
-    rightArm.position.y = -0.35;
-    rightArmGroup.add(rightArm);
-    rightArmGroup.position.set(0.4, 1.4, 0);
+    const rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.65, 0.14), limbMat);
+    rightArm.position.y = -0.3;
+    const rightHand = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.15, 0.12), skinMat);
+    rightHand.position.set(0, -0.65, 0);
+    rightArmGroup.add(rightArm, rightHand);
+    rightArmGroup.position.set(0.38, 1.35, 0);
 
+    // Articulated Legs
     const leftLegGroup = new THREE.Group();
-    const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.7, 0.2), darkPurpleMat);
+    const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.7, 0.18), pantsMat);
     leftLeg.position.y = -0.35;
     leftLegGroup.add(leftLeg);
-    leftLegGroup.position.set(-0.18, 0.7, 0);
+    leftLegGroup.position.set(-0.16, 0.7, 0);
 
     const rightLegGroup = new THREE.Group();
-    const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.7, 0.2), darkPurpleMat);
+    const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.7, 0.18), pantsMat);
     rightLeg.position.y = -0.35;
     rightLegGroup.add(rightLeg);
-    rightLegGroup.position.set(0.18, 0.7, 0);
+    rightLegGroup.position.set(0.16, 0.7, 0);
 
-    group.add(torso, neck, head, leftArmGroup, rightArmGroup, leftLegGroup, rightLegGroup);
+    group.add(torso, neck, head, hair, eyeL, eyeR, leftArmGroup, rightArmGroup, leftLegGroup, rightLegGroup);
 
     const angle = Math.random() * Math.PI * 2;
-    const dist = 25 + Math.random() * 30;
+    const dist = 30 + Math.random() * 30;
     group.position.set(Math.cos(angle) * dist, 0, Math.sin(angle) * dist);
 
     group.userData = {
         health: 100,
-        speed: 2.2,
+        speed: 2.1,
         walkCycle: Math.random() * Math.PI * 2,
         leftArmGroup, rightArmGroup, leftLegGroup, rightLegGroup
     };
@@ -172,112 +192,101 @@ function spawnHumanoidEnemy() {
     enemies.push(group);
 }
 
-// Solid Ground, Roads, All Detailed Buildings, Palms, Bridges & Fountains
+// Build Night City, Solid Black Tarmac Roads, Glowing Street Lamps, Traffic Lights, Billboards, Water Canals & Bridges
 function buildEnvironment(mapType) {
     environmentObjects.forEach(obj => scene.remove(obj));
     environmentObjects.length = 0;
+    trafficLightMeshes = [];
 
-    // 1. Solid Opaque Earth Base (No transparent grid)
+    // Solid Earth Base
     const floorGeo = new THREE.PlaneGeometry(320, 320);
-    const floorMat = new THREE.MeshStandardMaterial({ color: 0x2b332b, roughness: 0.9, metalness: 0.1 });
+    const floorMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.9 });
     const floor = new THREE.Mesh(floorGeo, floorMat);
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
     scene.add(floor);
 
-    // 2. City Tarmac Road Grid System with Yellow Centerlines & Gabros Footpaths
-    const roadMat = new THREE.MeshStandardMaterial({ color: 0x1f2329, roughness: 0.7 });
-    const lineMat = new THREE.MeshBasicMaterial({ color: 0xeab308 });
-    const gabrosMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.8 }); // Concrete pavers
+    // True Black Tarmac Roads & Gabros Footpaths
+    const tarmacMat = new THREE.MeshStandardMaterial({ color: 0x0b0d10, roughness: 0.8, metalness: 0.1 });
+    const gabrosMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.8 });
 
-    // Main Intersecting City Avenues
     for (let pos of [-50, 0, 50]) {
-        // North-South Road
-        const roadNS = new THREE.Mesh(new THREE.PlaneGeometry(12, 300), roadMat);
+        const roadNS = new THREE.Mesh(new THREE.PlaneGeometry(12, 320), tarmacMat);
         roadNS.rotation.x = -Math.PI / 2;
         roadNS.position.set(pos, 0.01, 0);
         scene.add(roadNS);
 
-        // Gabros Footpaths along Road Sides
-        const pathNSLeft = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 300), gabrosMat);
-        pathNSLeft.rotation.x = -Math.PI / 2;
-        pathNSLeft.position.set(pos - 7.25, 0.02, 0);
-        scene.add(pathNSLeft);
+        const pathL = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 320), gabrosMat);
+        pathL.rotation.x = -Math.PI / 2;
+        pathL.position.set(pos - 7.25, 0.02, 0);
+        scene.add(pathL);
 
-        const pathNSRight = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 300), gabrosMat);
-        pathNSRight.rotation.x = -Math.PI / 2;
-        pathNSRight.position.set(pos + 7.25, 0.02, 0);
-        scene.add(pathNSRight);
+        const pathR = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 320), gabrosMat);
+        pathR.rotation.x = -Math.PI / 2;
+        pathR.position.set(pos + 7.25, 0.02, 0);
+        scene.add(pathR);
 
-        // Center Yellow Line
-        const lineNS = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 300), lineMat);
-        lineNS.rotation.x = -Math.PI / 2;
-        lineNS.position.set(pos, 0.02, 0);
-        scene.add(lineNS);
-
-        // East-West Road
-        const roadEW = new THREE.Mesh(new THREE.PlaneGeometry(300, 12), roadMat);
+        const roadEW = new THREE.Mesh(new THREE.PlaneGeometry(320, 12), tarmacMat);
         roadEW.rotation.x = -Math.PI / 2;
         roadEW.position.set(0, 0.01, pos);
         scene.add(roadEW);
-
-        const lineEW = new THREE.Mesh(new THREE.PlaneGeometry(300, 0.3), lineMat);
-        lineEW.rotation.x = -Math.PI / 2;
-        lineEW.position.set(0, 0.02, pos);
-        scene.add(lineEW);
     }
 
-    // 3. Detailed Buildings with Doors, Windows & Balconies (Applied to ALL Buildings)
-    const wallColors = [0x334155, 0x475569, 0x1e293b, 0x3f3f46, 0x52525b];
-    const glassMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.1, metalness: 0.8 });
-    const doorMat = new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.6 });
-    const frameMat = new THREE.MeshStandardMaterial({ color: 0x0f172a });
+    // Water Canal & Bridges
+    const waterMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.1, metalness: 0.8 });
+    const canal = new THREE.Mesh(new THREE.PlaneGeometry(20, 320), waterMat);
+    canal.rotation.x = -Math.PI / 2;
+    canal.position.set(-100, 0.015, 0);
+    scene.add(canal);
+
+    // Bridge over Canal
+    const bridgeMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.5 });
+    const bridge = new THREE.Mesh(new THREE.BoxGeometry(24, 0.8, 14), bridgeMat);
+    bridge.position.set(-100, 0.4, 0);
+    scene.add(bridge);
+    environmentObjects.push(bridge);
+
+    // Detailed Buildings with Windows, Doors & Illuminated Billboards
+    const wallColors = [0x1e293b, 0x0f172a, 0x334155, 0x18181b];
+    const glassMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.1, emissive: 0x0284c7, emissiveIntensity: 0.3 });
+    const doorMat = new THREE.MeshStandardMaterial({ color: 0x27272a });
+    const billboardMat = new THREE.MeshBasicMaterial({ color: 0xa855f7 });
 
     for (let x = -110; x <= 110; x += 35) {
         for (let z = -110; z <= 110; z += 35) {
-            // Keep roads clear
             if (Math.abs(x) < 10 || Math.abs(x - 50) < 10 || Math.abs(x + 50) < 10) continue;
             if (Math.abs(z) < 10 || Math.abs(z - 50) < 10 || Math.abs(z + 50) < 10) continue;
 
             const bGroup = new THREE.Group();
             const width = 12 + Math.random() * 4;
-            const height = 10 + Math.random() * 14;
+            const height = 12 + Math.random() * 12;
             const depth = 12 + Math.random() * 4;
 
-            const colorHex = wallColors[Math.floor(Math.random() * wallColors.length)];
-            const wallMat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.6 });
-
-            // Main Building Block
+            const wallMat = new THREE.MeshStandardMaterial({ color: wallColors[Math.floor(Math.random() * wallColors.length)], roughness: 0.7 });
             const mainBox = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), wallMat);
             mainBox.position.y = height / 2;
-            mainBox.castShadow = true;
-            mainBox.receiveShadow = true;
             bGroup.add(mainBox);
 
-            // Roof Border Ledge
-            const ledge = new THREE.Mesh(new THREE.BoxGeometry(width + 0.4, 0.5, depth + 0.4), frameMat);
-            ledge.position.y = height + 0.25;
-            bGroup.add(ledge);
-
-            // Ground Floor Front Door
+            // Door
             const door = new THREE.Mesh(new THREE.BoxGeometry(2.2, 3.2, 0.2), doorMat);
             door.position.set(0, 1.6, depth / 2 + 0.1);
             bGroup.add(door);
 
-            // Windows Grid on Front & Back Facades
+            // Windows
             const winGeo = new THREE.BoxGeometry(1.4, 1.8, 0.15);
             for (let y = 4; y < height - 2; y += 3) {
                 for (let wx = -width / 2 + 2; wx <= width / 2 - 2; wx += 3) {
-                    // Front Window
                     const winF = new THREE.Mesh(winGeo, glassMat);
                     winF.position.set(wx, y, depth / 2 + 0.1);
                     bGroup.add(winF);
-
-                    // Back Window
-                    const winB = new THREE.Mesh(winGeo, glassMat);
-                    winB.position.set(wx, y, -depth / 2 - 0.1);
-                    bGroup.add(winB);
                 }
+            }
+
+            // Billboard on selected buildings
+            if (Math.random() > 0.6) {
+                const board = new THREE.Mesh(new THREE.BoxGeometry(5, 2.5, 0.2), billboardMat);
+                board.position.set(0, height - 2, depth / 2 + 0.3);
+                bGroup.add(board);
             }
 
             bGroup.position.set(x, 0, z);
@@ -286,111 +295,48 @@ function buildEnvironment(mapType) {
         }
     }
 
-    // 4. City Plaza Center: Fountain & Water Columns
-    const fountainGroup = new THREE.Group();
-    const basin = new THREE.Mesh(new THREE.CylinderGeometry(8, 9, 1.2, 24), gabrosMat);
-    basin.position.y = 0.6;
+    // Glowing Street Lamps & Cycling Traffic Lights at Intersections
+    const poleMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.8 });
+    const lampGeo = new THREE.SphereGeometry(0.3, 16, 16);
+    const lampMat = new THREE.MeshBasicMaterial({ color: 0xfef08a }); // Warm yellow glow
 
-    const waterBaseMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.1 });
-    const waterBase = new THREE.Mesh(new THREE.CylinderGeometry(7.6, 7.6, 0.8, 24), waterBaseMat);
-    waterBase.position.y = 0.8;
+    for (let x of [-56, 56]) {
+        for (let z of [-56, 0, 56]) {
+            const lampGroup = new THREE.Group();
+            const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 6, 8), poleMat);
+            pole.position.y = 3;
+            const bulb = new THREE.Mesh(lampGeo, lampMat);
+            bulb.position.set(0.6, 5.8, 0);
 
-    const pillar = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.5, 3.5, 16), gabrosMat);
-    pillar.position.y = 1.75;
+            const pointLight = new THREE.PointLight(0xfef08a, 1.5, 15);
+            pointLight.position.set(0.6, 5.5, 0);
 
-    // Animated Fountain Spout
-    fountainWaterColumn = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.4, 1.2, 4.5, 16),
-        new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.85 })
-    );
-    fountainWaterColumn.position.y = 4.2;
-
-    fountainGroup.add(basin, waterBase, pillar, fountainWaterColumn);
-    fountainGroup.position.set(25, 0, 25); // Placed at plaza road intersection
-    scene.add(fountainGroup);
-    environmentObjects.push(fountainGroup);
-
-    // 5. Realistic Vegetation: Palm Trees & Branching Oak Trees
-    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x3f2e1e, roughness: 0.9 });
-    const oakLeafMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.6 });
-    const palmLeafMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.4 });
-
-    for (let i = 0; i < 35; i++) {
-        const treeGroup = new THREE.Group();
-        const isPalm = Math.random() > 0.5;
-
-        if (isPalm) {
-            // Palm Tree with Curved Trunk & Fronds
-            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.4, 7, 8), trunkMat);
-            trunk.position.y = 3.5;
-            trunk.rotation.z = (Math.random() - 0.5) * 0.2;
-            treeGroup.add(trunk);
-
-            // Palm Fronds
-            for (let f = 0; f < 7; f++) {
-                const frond = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.08, 3.5), palmLeafMat);
-                frond.position.set(0, 7, 0);
-                frond.rotation.y = (f / 7) * Math.PI * 2;
-                frond.rotation.x = 0.4;
-                treeGroup.add(frond);
-            }
-        } else {
-            // Oak Tree with Distinguishable Branches
-            const mainTrunk = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.8, 5, 8), trunkMat);
-            mainTrunk.position.y = 2.5;
-            treeGroup.add(mainTrunk);
-
-            // 3 Sub-Branches
-            for (let b = 0; b < 3; b++) {
-                const branch = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.35, 2.5, 8), trunkMat);
-                branch.position.set((b - 1) * 0.8, 4.5, (b - 1) * 0.4);
-                branch.rotation.z = (b - 1) * 0.5;
-                treeGroup.add(branch);
-
-                // Leaf Clusters on Branches
-                const leaves = new THREE.Mesh(new THREE.DodecahedronGeometry(1.8, 1), oakLeafMat);
-                leaves.position.set((b - 1) * 1.5, 5.8, (b - 1) * 0.8);
-                treeGroup.add(leaves);
-            }
-        }
-
-        const tx = (Math.random() - 0.5) * 220;
-        const tz = (Math.random() - 0.5) * 220;
-        if (Math.abs(tx % 50) > 8 && Math.abs(tz % 50) > 8) {
-            treeGroup.position.set(tx, 0, tz);
-            scene.add(treeGroup);
-            environmentObjects.push(treeGroup);
+            lampGroup.add(pole, bulb, pointLight);
+            lampGroup.position.set(x, 0, z);
+            scene.add(lampGroup);
         }
     }
 
-    // 6. Parked Cars along Roadsides
-    const carMat = new THREE.MeshStandardMaterial({ color: 0x3b0764, roughness: 0.4 });
-    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+    // Traffic Lights at intersections
+    for (let x of [-55, 55]) {
+        for (let z of [-55, 55]) {
+            const tGroup = new THREE.Group();
+            const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 5, 8), poleMat);
+            pole.position.y = 2.5;
 
-    for (let i = 0; i < 14; i++) {
-        const carGroup = new THREE.Group();
-        const chassis = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.8, 4.2), carMat);
-        chassis.position.y = 0.6;
+            const box = new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.2, 0.3), poleMat);
+            box.position.set(0, 4.5, 0);
 
-        const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.7, 2.2), glassMat);
-        cabin.position.set(0, 1.25, -0.2);
+            const redLight = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), new THREE.MeshBasicMaterial({ color: 0xef4444 }));
+            redLight.position.set(0, 4.9, 0.16);
+            const greenLight = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), new THREE.MeshBasicMaterial({ color: 0x22c55e }));
+            greenLight.position.set(0, 4.1, 0.16);
 
-        const wGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.3, 16);
-        wGeo.rotateZ(Math.PI / 2);
-
-        const w1 = new THREE.Mesh(wGeo, wheelMat); w1.position.set(-1.1, 0.35, 1.2);
-        const w2 = new THREE.Mesh(wGeo, wheelMat); w2.position.set(1.1, 0.35, 1.2);
-        const w3 = new THREE.Mesh(wGeo, wheelMat); w3.position.set(-1.1, 0.35, -1.2);
-        const w4 = new THREE.Mesh(wGeo, wheelMat); w4.position.set(1.1, 0.35, -1.2);
-
-        carGroup.add(chassis, cabin, w1, w2, w3, w4);
-
-        const cx = [-57, 57, -7, 7][i % 4];
-        const cz = (i * 18) - 120;
-        carGroup.position.set(cx, 0, cz);
-
-        scene.add(carGroup);
-        environmentObjects.push(carGroup);
+            tGroup.add(pole, box, redLight, greenLight);
+            tGroup.position.set(x + 3, 0, z + 3);
+            scene.add(tGroup);
+            trafficLightMeshes.push({ red: redLight, green: greenLight, timer: Math.random() * 5 });
+        }
     }
 }
 
@@ -402,7 +348,7 @@ function initCharacterPreview() {
     const height = previewContainer.clientHeight || 180;
 
     const pScene = new THREE.Scene();
-    pScene.background = new THREE.Color(0x0b070f);
+    pScene.background = new THREE.Color(0x05070a);
     const pCamera = new THREE.PerspectiveCamera(50, width / height, 0.1, 50);
     pCamera.position.set(0, 1.2, 3.5);
 
@@ -460,6 +406,7 @@ function setupMenuUI() {
             document.getElementById('lobby-menu').classList.add('hidden');
             document.getElementById('ui-overlay').classList.remove('hidden');
             document.getElementById('crosshair').classList.remove('hidden');
+            document.getElementById('compass-container').classList.remove('hidden');
 
             if (graphicsPreset === 'performance') {
                 renderer.shadowMap.enabled = false;
@@ -475,20 +422,25 @@ function setupMenuUI() {
     }
 }
 
-// Update Real-Time HUD Compass (N, NE, E, SE, S, SW, W, NW)
-function updateHUDCompass() {
+// Update Circular Compass & Pitch Elevation Angle
+function updateCompassAndElevation() {
     const dir = new THREE.Vector3();
     camera.getWorldDirection(dir);
+
+    // Yaw Angle for Compass Needle Rotation
     let angleDeg = Math.atan2(-dir.x, -dir.z) * (180 / Math.PI);
     if (angleDeg < 0) angleDeg += 360;
 
-    const cardinalDirections = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW', 'N'];
-    const index = Math.round(angleDeg / 45);
-    const compassStr = cardinalDirections[index];
+    const needle = document.getElementById('compass-needle');
+    if (needle) {
+        needle.style.transform = `rotate(${angleDeg}deg)`;
+    }
 
-    const compassElem = document.getElementById('compass-display');
-    if (compassElem) {
-        compassElem.innerText = `COMPASS: ${compassStr} (${Math.floor(angleDeg)}°)`;
+    // Pitch Angle for Elevation Readout (-90 to +90 degrees)
+    const pitchDeg = Math.asin(dir.y) * (180 / Math.PI);
+    const elevationElem = document.getElementById('elevation-readout');
+    if (elevationElem) {
+        elevationElem.innerText = `PITCH: ${Math.floor(pitchDeg)}°`;
     }
 }
 
@@ -536,7 +488,7 @@ function shootWeapon() {
                 scene.remove(hitObj);
                 const idx = enemies.indexOf(hitObj);
                 if (idx > -1) enemies.splice(idx, 1);
-                setTimeout(spawnHumanoidEnemy, 3000);
+                setTimeout(spawnArticulatedEnemy, 3000);
             }
         }
     }
@@ -567,7 +519,7 @@ document.addEventListener('mouseup', (e) => {
     }
 });
 
-// Render Loop
+// Render Loop with Anti-Fusion Separation Physics & Traffic Cycles
 function animate() {
     requestAnimationFrame(animate);
 
@@ -575,17 +527,38 @@ function animate() {
     const delta = (time - prevTime) / 1000;
 
     if (controls) controls.update(delta);
-    updateHUDCompass();
+    updateCompassAndElevation();
 
-    // Pulse fountain water column
-    if (fountainWaterColumn) {
-        fountainWaterColumn.scale.y = 1 + Math.sin(time * 0.005) * 0.15;
-    }
+    // Cycle Traffic Lights
+    trafficLightMeshes.forEach(tl => {
+        tl.timer += delta;
+        if (tl.timer > 4) {
+            tl.timer = 0;
+            const isRedActive = tl.red.material.color.getHex() === 0xef4444;
+            tl.red.material.color.setHex(isRedActive ? 0x331111 : 0xef4444);
+            tl.green.material.color.setHex(isRedActive ? 0x22c55e : 0x113311);
+        }
+    });
 
-    enemies.forEach((enemy) => {
-        const dist = enemy.position.distanceTo(camera.position);
+    // Enemy AI & Anti-Fusion Push-Apart Physics
+    for (let i = 0; i < enemies.length; i++) {
+        const enemy = enemies[i];
+        const distToPlayer = enemy.position.distanceTo(camera.position);
 
-        if (dist > 1.4) {
+        // Separate from other enemies to prevent fusion/vibration
+        for (let j = i + 1; j < enemies.length; j++) {
+            const other = enemies[j];
+            const distBetween = enemy.position.distanceTo(other.position);
+            if (distBetween < 1.2) {
+                const pushDir = new THREE.Vector3().subVectors(enemy.position, other.position);
+                pushDir.y = 0;
+                pushDir.normalize();
+                enemy.position.addScaledVector(pushDir, 2.0 * delta);
+                other.position.addScaledVector(pushDir, -2.0 * delta);
+            }
+        }
+
+        if (distToPlayer > 1.4) {
             const dir = new THREE.Vector3().subVectors(camera.position, enemy.position);
             dir.y = 0;
             dir.normalize();
@@ -602,12 +575,12 @@ function animate() {
 
         enemy.lookAt(camera.position.x, 0, camera.position.z);
 
-        if (dist < 1.6) {
+        if (distToPlayer < 1.6) {
             health = Math.max(0, health - 0.3);
             document.getElementById('health-val').innerText = Math.floor(health);
             playSound('damage');
         }
-    });
+    }
 
     prevTime = time;
     renderer.render(scene, camera);

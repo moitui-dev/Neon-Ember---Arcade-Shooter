@@ -6,8 +6,8 @@
     <title>Omni Gaming Network - 3D Battlefield</title>
     <style>
         :root {
-            --bg-primary: #120d16;
-            --bg-secondary: rgba(30, 21, 38, 0.92);
+            --bg-primary: #0b0f19;
+            --bg-secondary: rgba(18, 24, 38, 0.94);
             --accent-burgundy: #581c87;
             --accent-glow: #9333ea;
             --text-main: #f3e8ff;
@@ -50,7 +50,7 @@
             justify-content: space-between;
             padding: 25px;
             box-sizing: border-box;
-            box-shadow: 10px 0 30px rgba(0, 0, 0, 0.7);
+            box-shadow: 10px 0 30px rgba(0, 0, 0, 0.8);
             overflow-y: auto;
         }
 
@@ -72,7 +72,7 @@
         #character-preview-container {
             width: 100%;
             height: 180px;
-            background: #0b070f;
+            background: #05070a;
             border: 1px solid var(--border-color);
             border-radius: 8px;
             margin: 15px 0;
@@ -161,7 +161,7 @@
         }
 
         .hud-panel {
-            background: rgba(18, 13, 22, 0.85);
+            background: rgba(18, 24, 38, 0.85);
             border: 1px solid var(--border-color);
             padding: 10px 15px;
             border-radius: 6px;
@@ -171,11 +171,56 @@
             pointer-events: auto;
         }
 
-        #compass-display {
+        /* Circular Compass Minimap on Bottom-Left */
+        #compass-container {
+            position: absolute;
+            bottom: 80px;
+            left: 20px;
+            width: 100px;
+            height: 100px;
+            background: rgba(11, 15, 25, 0.85);
+            border: 2px solid #9333ea;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 0 15px rgba(147, 51, 234, 0.4);
+            pointer-events: auto;
+            z-index: 5;
+        }
+
+        #compass-dial {
+            position: relative;
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: 1px dashed rgba(192, 132, 252, 0.4);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #compass-needle {
+            position: absolute;
+            width: 4px;
+            height: 50px;
+            background: linear-gradient(to top, #3b82f6 50%, #ef4444 50%);
+            border-radius: 2px;
+            transform-origin: center;
+            transition: transform 0.05s linear;
+        }
+
+        #elevation-readout {
+            position: absolute;
+            bottom: -22px;
+            width: 120px;
+            text-align: center;
+            font-size: 0.75rem;
+            color: #c084fc;
             font-family: monospace;
-            font-size: 1.1rem;
-            letter-spacing: 2px;
-            color: #a855f7;
+            background: rgba(11, 15, 25, 0.9);
+            border-radius: 4px;
+            padding: 2px;
         }
 
         #crosshair {
@@ -196,7 +241,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: radial-gradient(circle, rgba(0,0,0,0) 25%, rgba(10, 5, 15, 0.96) 65%);
+            background: radial-gradient(circle, rgba(0,0,0,0) 25%, rgba(10, 15, 25, 0.96) 65%);
             display: flex;
             justify-content: center;
             align-items: center;
@@ -283,10 +328,18 @@
 
 <div id="game-canvas-container"></div>
 
+<!-- Circular Compass HUD -->
+<div id="compass-container" class="hidden">
+    <div id="compass-dial">
+        <div id="compass-needle"></div>
+        <div id="elevation-readout">PITCH: 0°</div>
+    </div>
+</div>
+
 <div id="ui-overlay" class="hidden">
     <div style="display: flex; justify-content: space-between; align-items: center;">
         <div class="hud-panel">HEALTH: <span id="health-val">100</span>%</div>
-        <div class="hud-panel"><span id="compass-display">COMPASS: N (0°)</span></div>
+        <div class="hud-panel">SECTOR: NIGHT OPS</div>
         <div class="hud-panel">AMMO: <span id="ammo-val">30 / 90 (M16)</span></div>
     </div>
     <div style="display: flex; justify-content: space-between;">
