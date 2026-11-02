@@ -15,7 +15,7 @@
         <span class="logo-text">Omni Gaming Network</span>
     </div>
     <div class="nav-links">
-        <button class="nav-btn" onclick="alert('Auth feature integration point')">Sign In</button>
+        <button class="nav-btn" onclick="promptSignIn()">Sign In</button>
         <button class="nav-btn primary" onclick="alert('Check CONTRIBUTING.md to submit your own game via GitHub PR or URL!')">Submit Game</button>
     </div>
 </header>
@@ -35,33 +35,9 @@
         <button class="filter-chip" onclick="filterGames('Multiplayer')">Multiplayer</button>
     </div>
 
-    <!-- Dynamic Game Grid -->
+    <!-- Dynamic Game Grid (Populated automatically via portal.js & registry.json) -->
     <div class="game-grid" id="game-grid">
-        <!-- Game Card 1: Internal Neon Ember -->
-        <div class="game-card" data-category="Single Player">
-            <div class="game-thumb">
-                <span style="font-size: 3rem;">⚡</span>
-                <span class="game-badge">Single Player</span>
-            </div>
-            <div class="game-info">
-                <div class="game-title">Neon Ember</div>
-                <div class="game-author">By Omni Team (Internal)</div>
-                <button class="play-btn" onclick="launchGame('games/neon-ember/index.html', 'Neon Ember')">Play Game</button>
-            </div>
-        </div>
-
-        <!-- Placeholder for External Developer Game Submissions -->
-        <div class="game-card" data-category="1v1">
-            <div class="game-thumb">
-                <span style="font-size: 3rem;">🛡️</span>
-                <span class="game-badge">1v1 Battle</span>
-            </div>
-            <div class="game-info">
-                <div class="game-title">Cyber Grid Arena</div>
-                <div class="game-author">By External Dev (URL Hub)</div>
-                <button class="play-btn" onclick="launchGame('https://example.com', 'Cyber Grid Arena')">Play Game</button>
-            </div>
-        </div>
+        <!-- Cards injected dynamically -->
     </div>
 </main>
 
@@ -80,34 +56,8 @@
     <p>&copy; 2026 Omni Gaming Network. Built for open-source web creators.</p>
 </footer>
 
-<script>
-    function launchGame(path, title) {
-        document.getElementById('modal-game-title').innerText = title;
-        const container = document.getElementById('modal-iframe-container');
-        container.innerHTML = `<iframe src="${path}"></iframe>`;
-        document.getElementById('game-modal').classList.add('active');
-    }
-
-    function closeGameModal() {
-        document.getElementById('game-modal').classList.remove('active');
-        document.getElementById('modal-iframe-container').innerHTML = '';
-    }
-
-    function filterGames(category) {
-        // Update active chip UI
-        document.querySelectorAll('.filter-chip').forEach(btn => btn.classList.remove('active'));
-        event.target.classList.add('active');
-
-        // Filter cards
-        const cards = document.querySelectorAll('.game-card');
-        cards.forEach(card => {
-            if (category === 'all' || card.dataset.category === category) {
-                card.style.display = 'flex';
-            } else {
-                card.style.display = 'none';
-            }
-        });
-    }
-</script>
+<!-- Scripts -->
+<script src="js/auth.js"></script>
+<script src="js/portal.js"></script>
 </body>
 </html>
