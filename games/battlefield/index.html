@@ -171,6 +171,24 @@
             pointer-events: auto;
         }
 
+        /* Stamina Bar UI */
+        #stamina-container {
+            width: 160px;
+            height: 10px;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid #3b82f6;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-top: 6px;
+        }
+
+        #stamina-bar {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, #3b82f6, #60a5fa);
+            transition: width 0.1s ease;
+        }
+
         /* Circular Compass Minimap on Bottom-Left */
         #compass-container {
             position: absolute;
@@ -328,7 +346,6 @@
 
 <div id="game-canvas-container"></div>
 
-<!-- Circular Compass HUD -->
 <div id="compass-container" class="hidden">
     <div id="compass-dial">
         <div id="compass-needle"></div>
@@ -338,12 +355,15 @@
 
 <div id="ui-overlay" class="hidden">
     <div style="display: flex; justify-content: space-between; align-items: center;">
-        <div class="hud-panel">HEALTH: <span id="health-val">100</span>%</div>
+        <div class="hud-panel">
+            HEALTH: <span id="health-val">100</span>%
+            <div id="stamina-container"><div id="stamina-bar"></div></div>
+        </div>
         <div class="hud-panel">SECTOR: NIGHT OPS</div>
         <div class="hud-panel">AMMO: <span id="ammo-val">30 / 90 (M16)</span></div>
     </div>
     <div style="display: flex; justify-content: space-between;">
-        <div class="hud-panel">WASD = Move | Mouse = Look | Left-Click = Shoot | Right-Click = Scope | 1/2 = Weapon | G = Grenade</div>
+        <div class="hud-panel">WASD = Walk | Shift = Sprint | Space = Jump | Alt = Look Back | Right-Click = Scope</div>
         <div class="hud-panel"><a href="../../index.html" style="color: #c084fc; text-decoration: none;">EXIT TO HUB</a></div>
     </div>
 </div>
