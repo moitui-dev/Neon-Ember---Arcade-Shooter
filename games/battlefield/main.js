@@ -8,8 +8,8 @@ let isScoped = false;
 let gunGroup;
 
 let currentWeapon = 'M16';
-let selectedMap = 'city'; // 'city', 'forest', 'desert'
-let timeMode = 'day';     // 'day', 'night', 'auto'
+let selectedMap = 'city';
+let timeMode = 'day';
 let graphicsQuality = 'high';
 
 let ammoInMag = 30;
@@ -20,6 +20,8 @@ let shieldEnergy = 0;
 let isShieldActive = false;
 let isGameOver = false;
 let isGameStarted = false;
+let isCinematicIntro = false;
+let introProgress = 0;
 
 let stats = {
     kills: 0,
@@ -106,7 +108,7 @@ function initGame() {
     updateLightingAndSky();
 
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 1.6, 10);
+    camera.position.set(0, 1.6, 120); // Start way out in the sea for cinematic intro
 
     renderer = new THREE.WebGLRenderer({ antialias: graphicsQuality === 'high', powerPreference: "high-performance" });
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -261,7 +263,7 @@ function spawnTacticalSoldier() {
     group.add(torso, vest, head, helmet, leftArm, rightArm, leftLeg, rightLeg);
 
     const angle = Math.random() * Math.PI * 2;
-    const dist = 45 + Math.random() * 35; // Spawn slightly further away
+    const dist = 45 + Math.random() * 35;
     group.position.set(Math.cos(angle) * dist, 0, Math.sin(angle) * dist);
 
     group.userData = {
@@ -354,6 +356,15 @@ function buildEnvironment(mapType) {
     environmentObjects.forEach(obj => scene.remove(obj));
     environmentObjects.length = 0;
 
+    // Ocean / Sea stretching out from the shore
+    const oceanGeo = new THREE.PlaneGeometry(500, 500);
+    const oceanMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.1, metalness: 0.8 });
+    const ocean = new THREE.Mesh(oceanGeo, oceanMat);
+    ocean.rotation.x = -Math.PI / 2;
+    ocean.position.set(0, -0.2, 0);
+    scene.add(ocean);
+    environmentObjects.push(ocean);
+
     if (mapType === 'city') {
         const floorGeo = new THREE.PlaneGeometry(360, 360);
         const floorMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.9 });
@@ -405,14 +416,6 @@ function buildEnvironment(mapType) {
         terrain.rotation.x = -Math.PI / 2;
         scene.add(terrain);
         environmentObjects.push(terrain);
-
-        const waterGeo = new THREE.PlaneGeometry(20, 360);
-        const waterMat = new THREE.MeshStandardMaterial({ color: 0x0ea5e9, roughness: 0.2, transparent: true, opacity: 0.8 });
-        const waterStream = new THREE.Mesh(waterGeo, waterMat);
-        waterStream.rotation.x = -Math.PI / 2;
-        waterStream.position.set(0, 0.2, 0);
-        scene.add(waterStream);
-        environmentObjects.push(waterStream);
     } else if (mapType === 'desert') {
         const sandMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.9 });
         const desertFloor = new THREE.Mesh(new THREE.PlaneGeometry(360, 360), sandMat);
@@ -455,18 +458,17 @@ function initCharacterPreview() {
 }
 
 function createHUDOverlays() {
-    // CIRCULAR MINI-MAP RAISED HIGHER UP ON LEFT SIDE (AVOIDING COMPASS)
     const mapDiv = document.createElement('div');
     mapDiv.id = 'minimap-container';
     mapDiv.className = 'hidden';
     mapDiv.style.position = 'fixed';
     mapDiv.style.left = '20px';
-    mapDiv.style.bottom = '150px'; // Raised higher
+    mapDiv.style.bottom = '150px';
     mapDiv.style.width = '150px';
     mapDiv.style.height = '150px';
     mapDiv.style.backgroundColor = 'rgba(15, 23, 42, 0.85)';
     mapDiv.style.border = '2px solid #38bdf8';
-    mapDiv.style.borderRadius = '50%'; // Perfectly circular radar
+    mapDiv.style.borderRadius = '50%';
     mapDiv.style.overflow = 'hidden';
     mapDiv.style.zIndex = '100';
 
@@ -529,6 +531,8 @@ function createHUDOverlays() {
         shieldEnergy = 0;
         isGameOver = false;
         isGameStarted = true;
+        isCinematicIntro = false;
+        camera.position.set(0, 1.6, 10);
         document.getElementById('health-val').innerText = '100';
         document.getElementById('ammo-val').innerText = `${ammoInMag} / ${reserveAmmo} (M16)`;
         overlay.classList.add('hidden');
@@ -541,10 +545,13 @@ function setupLobbyUI() {
     if (deployBtn) {
         deployBtn.onclick = () => {
             isGameStarted = true;
+            isCinematicIntro = true;
+            introProgress = 0;
             isGameOver = false;
             health = 100;
-            document.getElementById('health-val').innerText = '100';
+            camera.position.set(0, 2.5, 120); // Start cinematic camera in the sea
 
+            document.getElementById('health-val').innerText = '100';
             document.getElementById('lobby-menu').classList.add('hidden');
             document.getElementById('ui-overlay').classList.remove('hidden');
             document.getElementById('crosshair').classList.remove('hidden');
@@ -553,7 +560,7 @@ function setupLobbyUI() {
             document.getElementById('minimap-container').classList.remove('hidden');
             document.getElementById('combat-hud-stats').classList.remove('hidden');
 
-            document.body.requestPointerLock();
+            // Do not request pointer lock immediately until cinematic intro finishes
             initVoiceChat();
         };
     }
@@ -570,7 +577,7 @@ function setupLobbyUI() {
         storyCard.style.color = '#cbd5e1';
         storyCard.style.fontSize = '0.85rem';
         storyCard.style.lineHeight = '1.4';
-        storyCard.innerHTML = `<strong style="color:#f8fafc;">Tactical Briefing:</strong> Survive high-stakes combat across dynamic battlegrounds. Defeat opposing riflemen, collect ammunition drops, earn shield protection, and conquer the leaderboard!`;
+        storyCard.innerHTML = `<strong style="color:#f8fafc;">Tactical Briefing:</strong> Infiltrate hostile coastal sectors from the sea. Swim ashore seamlessly, take your tactical position, eliminate enemy squads, and conquer the battlefield!`;
 
         const titleEl = lobbyMenu.querySelector('h1') || lobbyMenu.children[0];
         if (titleEl) titleEl.insertAdjacentElement('afterend', storyCard);
@@ -688,7 +695,7 @@ function updateCompassAndElevation() {
 }
 
 function performAction() {
-    if (isGameOver || !isGameStarted) return;
+    if (isGameOver || !isGameStarted || isCinematicIntro) return;
     stats.shotsFired++;
 
     if (currentWeapon === 'M16') {
@@ -754,7 +761,7 @@ function performAction() {
 }
 
 document.addEventListener('mousedown', (e) => {
-    if (document.pointerLockElement !== document.body || isGameOver || !isGameStarted) return;
+    if (document.pointerLockElement !== document.body || isGameOver || !isGameStarted || isCinematicIntro) return;
     if (e.button === 0) performAction();
     else if (e.button === 2) {
         isScoped = !isScoped;
@@ -766,7 +773,7 @@ document.addEventListener('mousedown', (e) => {
 document.addEventListener('contextmenu', e => e.preventDefault());
 
 document.addEventListener('keydown', (e) => {
-    if (document.pointerLockElement !== document.body || isGameOver || !isGameStarted) return;
+    if (document.pointerLockElement !== document.body || isGameOver || !isGameStarted || isCinematicIntro) return;
     if (e.code === 'KeyR') reloadWeapon();
     else if (e.code === 'KeyQ') activateShield();
     else if (e.key === '1') {
@@ -791,87 +798,99 @@ function animate() {
     const delta = (time - prevTime) / 1000;
 
     if (isGameStarted && !isGameOver) {
-        if (controls) controls.update(delta);
-        updateCompassAndElevation();
-        updateMiniMap();
+        // CINEMATIC SEA-SWIM INFILTRATION INTRO
+        if (isCinematicIntro) {
+            introProgress += delta * 12; // Glide speed towards shore
+            camera.position.z = Math.max(10, 120 - introProgress);
+            // Gentle bobbing wave motion while swimming
+            camera.position.y = 1.6 + Math.sin(introProgress * 0.5) * 0.3;
 
-        for (let debris of debrisObjects) {
-            debris.position.x += debris.userData.velocity.x * delta;
-            debris.position.z += debris.userData.velocity.y * delta;
-            debris.rotation.z += debris.userData.rotSpeed * delta;
-            if (debris.position.x > 180) debris.position.x = -180;
-            if (debris.position.z > 180) debris.position.z = -180;
-        }
-
-        for (let i = floatingTexts.length - 1; i >= 0; i--) {
-            const ft = floatingTexts[i];
-            ft.life -= delta;
-            ft.position.y += delta * 1.2;
-
-            const vector = ft.position.clone();
-            vector.project(camera);
-
-            const x = (vector.x * .5 + .5) * window.innerWidth;
-            const y = (-(vector.y * .5) + .5) * window.innerHeight;
-
-            ft.element.style.transform = `translate(-50%, -50%) translate(${x}px,${y}px)`;
-            ft.element.style.opacity = ft.life;
-
-            if (ft.life <= 0) {
-                ft.element.remove();
-                floatingTexts.splice(i, 1);
+            if (camera.position.z <= 10) {
+                isCinematicIntro = false;
+                document.body.requestPointerLock();
             }
-        }
+        } else {
+            if (controls) controls.update(delta);
+            updateCompassAndElevation();
+            updateMiniMap();
 
-        for (let i = lootCrates.length - 1; i >= 0; i--) {
-            const crate = lootCrates[i];
-            if (camera.position.distanceTo(crate.position) < 2.0) {
-                reserveAmmo += 30;
-                playSound('loot');
-                scene.remove(crate);
-                lootCrates.splice(i, 1);
-                const ammoDisplay = document.getElementById('ammo-val');
-                if (ammoDisplay && !isReloading) {
-                    ammoDisplay.innerText = `${ammoInMag} / ${reserveAmmo} (M16)`;
+            for (let debris of debrisObjects) {
+                debris.position.x += debris.userData.velocity.x * delta;
+                debris.position.z += debris.userData.velocity.y * delta;
+                debris.rotation.z += debris.userData.rotSpeed * delta;
+                if (debris.position.x > 180) debris.position.x = -180;
+                if (debris.position.z > 180) debris.position.z = -180;
+            }
+
+            for (let i = floatingTexts.length - 1; i >= 0; i--) {
+                const ft = floatingTexts[i];
+                ft.life -= delta;
+                ft.position.y += delta * 1.2;
+
+                const vector = ft.position.clone();
+                vector.project(camera);
+
+                const x = (vector.x * .5 + .5) * window.innerWidth;
+                const y = (-(vector.y * .5) + .5) * window.innerHeight;
+
+                ft.element.style.transform = `translate(-50%, -50%) translate(${x}px,${y}px)`;
+                ft.element.style.opacity = ft.life;
+
+                if (ft.life <= 0) {
+                    ft.element.remove();
+                    floatingTexts.splice(i, 1);
                 }
             }
-        }
 
-        for (let i = 0; i < enemies.length; i++) {
-            const enemy = enemies[i];
-            const distToPlayer = enemy.position.distanceTo(camera.position);
-
-            enemy.lookAt(camera.position.x, enemy.position.y, camera.position.z);
-
-            // AI ONLY ENGAGES WHEN YOU GET WITHIN AGGRO RANGE (NO SNIPING ACROSS MAP)
-            if (distToPlayer <= 35) {
-                if (distToPlayer > enemy.userData.idealRange + 3) {
-                    const dir = new THREE.Vector3().subVectors(camera.position, enemy.position);
-                    dir.y = 0;
-                    dir.normalize();
-                    enemy.position.addScaledVector(dir, enemy.userData.speed * delta);
-                } else if (distToPlayer < enemy.userData.idealRange - 3) {
-                    const dir = new THREE.Vector3().subVectors(enemy.position, camera.position);
-                    dir.y = 0;
-                    dir.normalize();
-                    enemy.position.addScaledVector(dir, enemy.userData.speed * 0.7 * delta);
+            for (let i = lootCrates.length - 1; i >= 0; i--) {
+                const crate = lootCrates[i];
+                if (camera.position.distanceTo(crate.position) < 2.0) {
+                    reserveAmmo += 30;
+                    playSound('loot');
+                    scene.remove(crate);
+                    lootCrates.splice(i, 1);
+                    const ammoDisplay = document.getElementById('ammo-val');
+                    if (ammoDisplay && !isReloading) {
+                        ammoDisplay.innerText = `${ammoInMag} / ${reserveAmmo} (M16)`;
+                    }
                 }
+            }
 
-                if (distToPlayer <= 22) {
-                    if (time - enemy.userData.lastShotTime > 2500) {
-                        enemy.userData.lastShotTime = time;
-                        playSound('enemy_shot');
+            for (let i = 0; i < enemies.length; i++) {
+                const enemy = enemies[i];
+                const distToPlayer = enemy.position.distanceTo(camera.position);
 
-                        if (!isShieldActive) {
-                            health = Math.max(0, health - 6);
-                            document.getElementById('health-val').innerText = Math.floor(health);
-                            playSound('damage');
-                        }
+                enemy.lookAt(camera.position.x, enemy.position.y, camera.position.z);
 
-                        if (health <= 0) {
-                            isGameOver = true;
-                            document.exitPointerLock();
-                            document.getElementById('game-over-screen').classList.remove('hidden');
+                if (distToPlayer <= 35) {
+                    if (distToPlayer > enemy.userData.idealRange + 3) {
+                        const dir = new THREE.Vector3().subVectors(camera.position, enemy.position);
+                        dir.y = 0;
+                        dir.normalize();
+                        enemy.position.addScaledVector(dir, enemy.userData.speed * delta);
+                    } else if (distToPlayer < enemy.userData.idealRange - 3) {
+                        const dir = new THREE.Vector3().subVectors(enemy.position, camera.position);
+                        dir.y = 0;
+                        dir.normalize();
+                        enemy.position.addScaledVector(dir, enemy.userData.speed * 0.7 * delta);
+                    }
+
+                    if (distToPlayer <= 22) {
+                        if (time - enemy.userData.lastShotTime > 2500) {
+                            enemy.userData.lastShotTime = time;
+                            playSound('enemy_shot');
+
+                            if (!isShieldActive) {
+                                health = Math.max(0, health - 6);
+                                document.getElementById('health-val').innerText = Math.floor(health);
+                                playSound('damage');
+                            }
+
+                            if (health <= 0) {
+                                isGameOver = true;
+                                document.exitPointerLock();
+                                document.getElementById('game-over-screen').classList.remove('hidden');
+                            }
                         }
                     }
                 }
