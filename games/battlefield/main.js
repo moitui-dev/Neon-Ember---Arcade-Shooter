@@ -33,7 +33,7 @@ const lootCrates = [];
 const floatingTexts = [];
 const debrisObjects = [];
 const environmentObjects = [];
-let dirLight, ambientLight, cloudsGroup, skyMesh;
+let dirLight, ambientLight, cloudsGroup;
 let miniMapCtx, miniMapCanvas;
 let prevTime = performance.now();
 
@@ -136,7 +136,7 @@ function updateLightingAndSky() {
         scene.fog = new THREE.FogExp2(0x0a0e1a, 0.007);
         if (ambientLight) ambientLight.intensity = 0.3;
         if (dirLight) dirLight.intensity = 0.4;
-    } else { // Auto cycle
+    } else {
         const hour = new Date().getHours();
         const isDay = hour >= 6 && hour < 18;
         scene.background = new THREE.Color(isDay ? 0x38bdf8 : 0x0a0e1a);
@@ -363,8 +363,6 @@ function buildEnvironment(mapType) {
         environmentObjects.push(floor);
 
         const tarmacMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.8 });
-        const stripeMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
-
         for (let pos of [-50, 0, 50]) {
             const road = new THREE.Mesh(new THREE.PlaneGeometry(14, 360), tarmacMat);
             road.rotation.x = -Math.PI / 2;
@@ -373,7 +371,6 @@ function buildEnvironment(mapType) {
             environmentObjects.push(road);
         }
 
-        // City Fountain & Monument in center
         const fountainBase = new THREE.Mesh(new THREE.CylinderGeometry(4, 4, 1, 16), new THREE.MeshStandardMaterial({ color: 0x94a3b8 }));
         fountainBase.position.set(20, 0.5, 20);
         const statue = new THREE.Mesh(new THREE.ConeGeometry(1.2, 4, 8), new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.8 }));
@@ -393,7 +390,6 @@ function buildEnvironment(mapType) {
             }
         }
     } else if (mapType === 'forest') {
-        // Hilly green terrain with ground water stream
         const terrainGeo = new THREE.PlaneGeometry(360, 360, 32, 32);
         const posAttr = terrainGeo.attributes.position;
         for (let i = 0; i < posAttr.count; i++) {
@@ -409,7 +405,6 @@ function buildEnvironment(mapType) {
         scene.add(terrain);
         environmentObjects.push(terrain);
 
-        // Ground water stream
         const waterGeo = new THREE.PlaneGeometry(20, 360);
         const waterMat = new THREE.MeshStandardMaterial({ color: 0x0ea5e9, roughness: 0.2, transparent: true, opacity: 0.8 });
         const waterStream = new THREE.Mesh(waterGeo, waterMat);
@@ -503,7 +498,7 @@ function createHUDOverlays() {
     `;
     document.body.appendChild(hudInfo);
 
-    // Game Over Overlay
+    // Game Over Overlay (Starts Hidden)
     const overlay = document.createElement('div');
     overlay.id = 'game-over-screen';
     overlay.className = 'hidden';
@@ -553,17 +548,24 @@ function setupLobbyUI() {
         };
     }
 
-    // Add Story Paragraph & Settings Gear to Lobby Menu
+    // Cleanly structure story briefing and settings gear without overlapping elements
     const lobbyMenu = document.getElementById('lobby-menu');
     if (lobbyMenu && !document.getElementById('story-desc')) {
+        lobbyMenu.style.overflowY = 'auto';
+        lobbyMenu.style.paddingTop = '40px';
+
         const storyDiv = document.createElement('div');
         storyDiv.id = 'story-desc';
-        storyDiv.style.padding = '10px 15px';
+        storyDiv.style.padding = '10px 0';
         storyDiv.style.color = '#94a3b8';
-        storyDiv.style.fontSize = '0.9rem';
+        storyDiv.style.fontSize = '0.85rem';
         storyDiv.style.lineHeight = '1.4';
+        storyDiv.style.maxWidth = '320px';
         storyDiv.innerHTML = `<strong>Mission Briefing:</strong> Deploy into hostile sectors armed with assault rifles and tactical melee gear. Eliminate opposing combat squads in last-man-standing gunfights, collect ammo crates from fallen foes, and climb the military ranks!`;
-        lobbyMenu.insertBefore(storyDiv, lobbyMenu.firstChild);
+
+        // Insert right beneath the title heading nicely
+        const titleEl = lobbyMenu.querySelector('h1') || lobbyMenu.children[0];
+        if (titleEl) titleEl.insertAdjacentElement('afterend', storyDiv);
 
         // Settings Gear Button
         const gearBtn = document.createElement('button');
