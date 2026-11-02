@@ -436,12 +436,12 @@ function initCharacterPreview() {
 }
 
 function createHUDOverlays() {
-    // Mini-map on left side
+    // Mini-map on bottom-left above bottom bar
     const mapDiv = document.createElement('div');
     mapDiv.id = 'minimap-container';
     mapDiv.style.position = 'fixed';
     mapDiv.style.left = '20px';
-    mapDiv.style.bottom = '80px';
+    mapDiv.style.bottom = '110px';
     mapDiv.style.width = '160px';
     mapDiv.style.height = '160px';
     mapDiv.style.backgroundColor = 'rgba(15, 23, 42, 0.85)';
@@ -459,12 +459,12 @@ function createHUDOverlays() {
     document.body.appendChild(mapDiv);
     miniMapCtx = miniMapCanvas.getContext('2d');
 
-    // Shield & Stats HUD Top-Right / Left
+    // Combat Stats HUD cleanly positioned below the Health Panel on top-left (no overlap)
     const hudInfo = document.createElement('div');
     hudInfo.id = 'combat-hud-stats';
     hudInfo.style.position = 'fixed';
     hudInfo.style.left = '20px';
-    hudInfo.style.top = '20px';
+    hudInfo.style.top = '105px';
     hudInfo.style.color = '#f8fafc';
     hudInfo.style.fontFamily = 'sans-serif';
     hudInfo.style.fontSize = '14px';
@@ -473,8 +473,8 @@ function createHUDOverlays() {
     hudInfo.innerHTML = `
         <div>Rank: <span id="rank-val" style="color: #facc15; font-weight: bold;">Private</span></div>
         <div>Kills: <span id="kills-val">0</span> | Headshots: <span id="headshots-val">0</span></div>
-        <div style="margin-top: 6px;">Shield: <span id="shield-status" style="color: #38bdf8; font-weight: bold;">Charging...</span></div>
-        <div style="width: 120px; height: 8px; background: #334155; border-radius: 4px; overflow: hidden; margin-top: 3px;">
+        <div style="margin-top: 4px;">Shield: <span id="shield-status" style="color: #38bdf8; font-weight: bold;">Charging...</span></div>
+        <div style="width: 140px; height: 8px; background: #334155; border-radius: 4px; overflow: hidden; margin-top: 3px;">
             <div id="shield-bar" style="width: 0%; height: 100%; background: #38bdf8; transition: width 0.2s;"></div>
         </div>
     `;
@@ -535,15 +535,12 @@ function updateMiniMap() {
     if (!miniMapCtx) return;
     miniMapCtx.clearRect(0, 0, 160, 160);
 
-    // Background grid
     miniMapCtx.fillStyle = '#0f172a';
     miniMapCtx.fillRect(0, 0, 160, 160);
 
-    // Center player on mini-map
     const px = 80;
     const py = 80;
 
-    // Draw Enemies as red dots
     for (let enemy of enemies) {
         const dx = (enemy.position.x - camera.position.x) * 2.0;
         const dz = (enemy.position.z - camera.position.z) * 2.0;
@@ -555,7 +552,6 @@ function updateMiniMap() {
         }
     }
 
-    // Draw Player marker
     miniMapCtx.fillStyle = '#38bdf8';
     miniMapCtx.beginPath();
     miniMapCtx.arc(px, py, 4, 0, Math.PI * 2);
@@ -623,7 +619,6 @@ function performAction() {
                     document.getElementById('shield-status').innerText = `SHIELD READY (Press Q)`;
                 }
 
-                // Promotion logic
                 if (stats.kills >= 10) stats.rank = 'General';
                 else if (stats.kills >= 6) stats.rank = 'Sergeant';
                 else if (stats.kills >= 3) stats.rank = 'Corporal';
@@ -641,11 +636,10 @@ function performAction() {
     }
 }
 
-// Keybindings for Scope (Right-Click simulation / Key controls), Reload, Weapons, and Shield
 document.addEventListener('mousedown', (e) => {
     if (document.pointerLockElement !== document.body || isGameOver) return;
     if (e.button === 0) performAction();
-    else if (e.button === 2) { // Right Click Scope
+    else if (e.button === 2) {
         isScoped = !isScoped;
         camera.fov = isScoped ? 35 : 75;
         camera.updateProjectionMatrix();
@@ -683,13 +677,11 @@ function animate() {
     updateCompassAndElevation();
     updateMiniMap();
 
-    // Clouds movement
     if (cloudsGroup) {
         cloudsGroup.position.x += delta * 2.0;
         if (cloudsGroup.position.x > 200) cloudsGroup.position.x = -200;
     }
 
-    // Visible Wind Debris movement & rolling
     for (let debris of debrisObjects) {
         debris.position.x += debris.userData.velocity.x * delta;
         debris.position.z += debris.userData.velocity.y * delta;
@@ -698,7 +690,6 @@ function animate() {
         if (debris.position.z > 180) debris.position.z = -180;
     }
 
-    // Floating text tracking
     for (let i = floatingTexts.length - 1; i >= 0; i--) {
         const ft = floatingTexts[i];
         ft.life -= delta;
@@ -719,7 +710,6 @@ function animate() {
         }
     }
 
-    // Check Loot pickups
     for (let i = lootCrates.length - 1; i >= 0; i--) {
         const crate = lootCrates[i];
         if (camera.position.distanceTo(crate.position) < 2.0) {
@@ -734,7 +724,6 @@ function animate() {
         }
     }
 
-    // TACTICAL STANDOFF COMBAT SQUAD AI
     if (!isGameOver) {
         for (let i = 0; i < enemies.length; i++) {
             const enemy = enemies[i];
