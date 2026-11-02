@@ -261,7 +261,7 @@ function spawnTacticalSoldier() {
     group.add(torso, vest, head, helmet, leftArm, rightArm, leftLeg, rightLeg);
 
     const angle = Math.random() * Math.PI * 2;
-    const dist = 35 + Math.random() * 45;
+    const dist = 45 + Math.random() * 35; // Spawn slightly further away
     group.position.set(Math.cos(angle) * dist, 0, Math.sin(angle) * dist);
 
     group.userData = {
@@ -455,23 +455,24 @@ function initCharacterPreview() {
 }
 
 function createHUDOverlays() {
+    // CIRCULAR MINI-MAP RAISED HIGHER UP ON LEFT SIDE (AVOIDING COMPASS)
     const mapDiv = document.createElement('div');
     mapDiv.id = 'minimap-container';
     mapDiv.className = 'hidden';
     mapDiv.style.position = 'fixed';
     mapDiv.style.left = '20px';
-    mapDiv.style.bottom = '110px';
-    mapDiv.style.width = '160px';
-    mapDiv.style.height = '160px';
+    mapDiv.style.bottom = '150px'; // Raised higher
+    mapDiv.style.width = '150px';
+    mapDiv.style.height = '150px';
     mapDiv.style.backgroundColor = 'rgba(15, 23, 42, 0.85)';
     mapDiv.style.border = '2px solid #38bdf8';
-    mapDiv.style.borderRadius = '12px';
+    mapDiv.style.borderRadius = '50%'; // Perfectly circular radar
     mapDiv.style.overflow = 'hidden';
     mapDiv.style.zIndex = '100';
 
     miniMapCanvas = document.createElement('canvas');
-    miniMapCanvas.width = 160;
-    miniMapCanvas.height = 160;
+    miniMapCanvas.width = 150;
+    miniMapCanvas.height = 150;
     miniMapCanvas.style.width = '100%';
     miniMapCanvas.style.height = '100%';
     mapDiv.appendChild(miniMapCanvas);
@@ -645,18 +646,23 @@ function setupLobbyUI() {
 
 function updateMiniMap() {
     if (!miniMapCtx) return;
-    miniMapCtx.clearRect(0, 0, 160, 160);
+    miniMapCtx.clearRect(0, 0, 150, 150);
+
+    miniMapCtx.save();
+    miniMapCtx.beginPath();
+    miniMapCtx.arc(75, 75, 75, 0, Math.PI * 2);
+    miniMapCtx.clip();
 
     miniMapCtx.fillStyle = '#0f172a';
-    miniMapCtx.fillRect(0, 0, 160, 160);
+    miniMapCtx.fillRect(0, 0, 150, 150);
 
-    const px = 80;
-    const py = 80;
+    const px = 75;
+    const py = 75;
 
     for (let enemy of enemies) {
         const dx = (enemy.position.x - camera.position.x) * 2.0;
         const dz = (enemy.position.z - camera.position.z) * 2.0;
-        if (Math.abs(dx) < 80 && Math.abs(dz) < 80) {
+        if (Math.abs(dx) < 75 && Math.abs(dz) < 75) {
             miniMapCtx.fillStyle = '#ef4444';
             miniMapCtx.beginPath();
             miniMapCtx.arc(px + dx, py + dz, 3, 0, Math.PI * 2);
@@ -668,6 +674,7 @@ function updateMiniMap() {
     miniMapCtx.beginPath();
     miniMapCtx.arc(px, py, 4, 0, Math.PI * 2);
     miniMapCtx.fill();
+    miniMapCtx.restore();
 }
 
 function updateCompassAndElevation() {
@@ -783,7 +790,6 @@ function animate() {
     const time = performance.now();
     const delta = (time - prevTime) / 1000;
 
-    // Completely frozen until user deploys from lobby
     if (isGameStarted && !isGameOver) {
         if (controls) controls.update(delta);
         updateCompassAndElevation();
@@ -837,33 +843,36 @@ function animate() {
 
             enemy.lookAt(camera.position.x, enemy.position.y, camera.position.z);
 
-            if (distToPlayer > enemy.userData.idealRange + 3) {
-                const dir = new THREE.Vector3().subVectors(camera.position, enemy.position);
-                dir.y = 0;
-                dir.normalize();
-                enemy.position.addScaledVector(dir, enemy.userData.speed * delta);
-            } else if (distToPlayer < enemy.userData.idealRange - 3) {
-                const dir = new THREE.Vector3().subVectors(enemy.position, camera.position);
-                dir.y = 0;
-                dir.normalize();
-                enemy.position.addScaledVector(dir, enemy.userData.speed * 0.7 * delta);
-            }
+            // AI ONLY ENGAGES WHEN YOU GET WITHIN AGGRO RANGE (NO SNIPING ACROSS MAP)
+            if (distToPlayer <= 35) {
+                if (distToPlayer > enemy.userData.idealRange + 3) {
+                    const dir = new THREE.Vector3().subVectors(camera.position, enemy.position);
+                    dir.y = 0;
+                    dir.normalize();
+                    enemy.position.addScaledVector(dir, enemy.userData.speed * delta);
+                } else if (distToPlayer < enemy.userData.idealRange - 3) {
+                    const dir = new THREE.Vector3().subVectors(enemy.position, camera.position);
+                    dir.y = 0;
+                    dir.normalize();
+                    enemy.position.addScaledVector(dir, enemy.userData.speed * 0.7 * delta);
+                }
 
-            if (distToPlayer <= 25) {
-                if (time - enemy.userData.lastShotTime > 2200) {
-                    enemy.userData.lastShotTime = time;
-                    playSound('enemy_shot');
+                if (distToPlayer <= 22) {
+                    if (time - enemy.userData.lastShotTime > 2500) {
+                        enemy.userData.lastShotTime = time;
+                        playSound('enemy_shot');
 
-                    if (!isShieldActive) {
-                        health = Math.max(0, health - 8);
-                        document.getElementById('health-val').innerText = Math.floor(health);
-                        playSound('damage');
-                    }
+                        if (!isShieldActive) {
+                            health = Math.max(0, health - 6);
+                            document.getElementById('health-val').innerText = Math.floor(health);
+                            playSound('damage');
+                        }
 
-                    if (health <= 0) {
-                        isGameOver = true;
-                        document.exitPointerLock();
-                        document.getElementById('game-over-screen').classList.remove('hidden');
+                        if (health <= 0) {
+                            isGameOver = true;
+                            document.exitPointerLock();
+                            document.getElementById('game-over-screen').classList.remove('hidden');
+                        }
                     }
                 }
             }
