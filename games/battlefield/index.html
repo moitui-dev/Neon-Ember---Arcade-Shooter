@@ -7,7 +7,7 @@
     <style>
         :root {
             --bg-primary: #120d16;
-            --bg-secondary: #1e1526;
+            --bg-secondary: rgba(30, 21, 38, 0.92);
             --accent-burgundy: #581c87;
             --accent-glow: #9333ea;
             --text-main: #f3e8ff;
@@ -35,71 +35,83 @@
             z-index: 1;
         }
 
-        /* Tactical Main Menu / Lobby Overlay */
+        /* Professional Sidebar Menu */
         #lobby-menu {
             position: absolute;
             top: 0;
             left: 0;
-            width: 100%;
+            width: 460px;
             height: 100%;
-            background: linear-gradient(135deg, rgba(18, 13, 22, 0.95), rgba(30, 21, 38, 0.95));
+            background: var(--bg-secondary);
+            backdrop-filter: blur(12px);
+            border-right: 2px solid var(--border-color);
             z-index: 10;
             display: flex;
             flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
+            justify-content: space-between;
+            padding: 25px;
             box-sizing: border-box;
+            box-shadow: 10px 0 30px rgba(0, 0, 0, 0.7);
+            overflow-y: auto;
         }
 
-        .lobby-card {
-            background: var(--bg-secondary);
-            border: 2px solid var(--border-color);
-            border-radius: 12px;
-            padding: 30px 40px;
-            width: 600px;
-            max-width: 90%;
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6);
-            text-align: center;
-        }
-
-        h1 {
-            margin-top: 0;
+        .menu-header h1 {
+            margin: 0 0 5px 0;
             color: #e9d5ff;
-            font-size: 2rem;
-            letter-spacing: 2px;
+            font-size: 1.6rem;
+            letter-spacing: 1.5px;
             text-transform: uppercase;
             text-shadow: 0 0 10px rgba(147, 51, 234, 0.5);
         }
 
+        .menu-header p {
+            margin: 0;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+
+        /* Character & Weapon Preview Window */
+        #character-preview-container {
+            width: 100%;
+            height: 180px;
+            background: #0b070f;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin: 15px 0;
+            position: relative;
+            overflow: hidden;
+        }
+
         .section-group {
-            margin: 20px 0;
+            margin: 12px 0;
             text-align: left;
         }
 
         .section-group label {
             display: block;
-            font-size: 0.85rem;
+            font-size: 0.75rem;
             color: var(--text-muted);
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             text-transform: uppercase;
             letter-spacing: 1px;
+            font-weight: bold;
         }
 
         .options-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
+            gap: 8px;
         }
 
         .option-btn {
             background: #171021;
             border: 1px solid var(--border-color);
             color: var(--text-main);
-            padding: 10px;
+            padding: 8px;
             border-radius: 6px;
             cursor: pointer;
             font-weight: 600;
+            font-size: 0.8rem;
             transition: all 0.2s ease;
         }
 
@@ -119,14 +131,14 @@
             border: 1px solid #a855f7;
             color: white;
             width: 100%;
-            padding: 14px;
-            font-size: 1.1rem;
+            padding: 12px;
+            font-size: 1rem;
             font-weight: bold;
             border-radius: 6px;
             cursor: pointer;
             text-transform: uppercase;
             letter-spacing: 1px;
-            margin-top: 15px;
+            margin-top: 10px;
             transition: transform 0.1s ease, box-shadow 0.2s ease;
         }
 
@@ -159,6 +171,7 @@
             backdrop-filter: blur(5px);
             font-weight: 600;
             font-size: 0.9rem;
+            pointer-events: auto;
         }
 
         #crosshair {
@@ -220,38 +233,47 @@
 </head>
 <body>
 
-<!-- Pre-Game Tactical Lobby & Menu -->
+<!-- Sidebar Tactical Menu -->
 <div id="lobby-menu">
-    <div class="lobby-card">
+    <div class="menu-header">
         <h1>Omni Tactical 3D</h1>
-        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px;">Configure deployment parameters before entering combat zone.</p>
+        <p>First-Person Combat Simulator</p>
+    </div>
+
+    <div style="flex-grow: 1; overflow-y: auto; padding-right: 5px;">
+        <div class="section-group">
+            <label>Loadout Preview</label>
+            <div id="character-preview-container"></div>
+        </div>
 
         <div class="section-group">
             <label>Select Map Ground</label>
             <div class="options-grid" id="map-selector">
                 <button class="option-btn active" data-map="city">City Ruins</button>
-                <button class="option-btn" data-map="forest">Dense Forest</button>
-                <button class="option-btn" data-map="bunker">Desert Bunker</button>
+                <button class="option-btn" data-map="forest">Forest</button>
+                <button class="option-btn" data-map="bunker">Bunker</button>
             </div>
         </div>
 
         <div class="section-group">
             <label>Combat Game Mode</label>
             <div class="options-grid" id="mode-selector">
-                <button class="option-btn active" data-mode="solo">Solo Survival</button>
-                <button class="option-btn" data-mode="zombie">Zombie Wave</button>
-                <button class="option-btn" data-mode="multiplayer">Online Lobby</button>
+                <button class="option-btn active" data-mode="solo">Solo</button>
+                <button class="option-btn" data-mode="zombie">Zombies</button>
+                <button class="option-btn" data-mode="multiplayer">Online</button>
             </div>
         </div>
 
         <div class="section-group">
-            <label>Graphics & Performance</label>
+            <label>Graphics Quality</label>
             <div class="options-grid" id="graphics-selector">
-                <button class="option-btn active" data-gfx="high">High Visuals</button>
+                <button class="option-btn active" data-gfx="high">High</button>
                 <button class="option-btn" data-gfx="performance">Max FPS</button>
             </div>
         </div>
+    </div>
 
+    <div>
         <button class="launch-btn" id="start-deployment-btn">Deploy to Battlefield</button>
     </div>
 </div>
@@ -265,7 +287,7 @@
         <div class="hud-panel">AMMO: <span id="ammo-val">30 / 90 (M16)</span></div>
     </div>
     <div style="display: flex; justify-content: space-between;">
-        <div class="hud-panel">CONTROLS: WASD = Move | Mouse = Look | Left-Click = Shoot | Right-Click = Scope | 1/2 = Weapon | G = Grenade</div>
+        <div class="hud-panel">WASD = Move | Mouse = Look | Left-Click = Shoot | Right-Click = Scope | 1/2 = Weapon | G = Grenade</div>
         <div class="hud-panel"><a href="../../index.html" style="color: #c084fc; text-decoration: none;">EXIT TO HUB</a></div>
     </div>
 </div>
