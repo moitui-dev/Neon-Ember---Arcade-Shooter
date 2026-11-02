@@ -6,16 +6,16 @@ let allGames = [];
 
 async function loadGames() {
     try {
-        // Correct relative path from js/ folder to root games/registry.json
-        const response = await fetch('../games/registry.json');
+        // Primary fetch for root-level HTML deployment structure
+        const response = await fetch('games/registry.json');
         if (!response.ok) throw new Error('Registry not found');
         allGames = await response.json();
         renderGames(allGames);
     } catch (error) {
-        console.error('Trying root-level registry path...', error);
+        console.error('Trying alternative registry path...', error);
         try {
-            // Fallback for flat server roots
-            const fallbackResponse = await fetch('games/registry.json');
+            // Fallback path if hosted from a subdirectory
+            const fallbackResponse = await fetch('../games/registry.json');
             allGames = await fallbackResponse.json();
             renderGames(allGames);
         } catch (err) {
@@ -74,7 +74,6 @@ function closeGameModal() {
     document.getElementById('game-modal').classList.remove('active');
 }
 
-// Listen for postMessage score submissions from game iframes
 window.addEventListener('message', (event) => {
     if (event.data && event.data.type === 'GAME_SCORE_SUBMIT') {
         const { gameId, score } = event.data;
