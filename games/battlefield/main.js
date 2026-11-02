@@ -168,20 +168,15 @@ function spawnTacticalSoldier() {
     const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2), armorMat);
     helmet.position.y = 1.78;
 
-    // PROMINENT ASSAULT RIFLE HELD ACROSS THEIR CHEST POINTING FORWARD
+    // VISIBLE ASSAULT RIFLE EXTENDING FORWARD FROM THE CHEST
     const rifleGroup = new THREE.Group();
-    const rifleBody = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.14, 0.9), new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.9 }));
-    const rifleBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.7), new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.8 }));
+    const rifleBody = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.15, 1.0), new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.9 }));
+    const rifleBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.8), new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.9 }));
     rifleBarrel.rotation.x = Math.PI / 2;
     rifleBarrel.position.set(0, 0, -0.7);
-    const rifleStock = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 0.3), new THREE.MeshStandardMaterial({ color: 0x332211 }));
-    rifleStock.position.set(0, 0, 0.5);
-    const rifleMag = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.18, 0.1), new THREE.MeshStandardMaterial({ color: 0x444444 }));
-    rifleMag.position.set(0, -0.15, -0.1);
 
-    rifleGroup.add(rifleBody, rifleBarrel, rifleStock, rifleMag);
-    // Positioned dead-center across the chest, raised and pointing outward
-    rifleGroup.position.set(0, 1.15, -0.35);
+    rifleGroup.add(rifleBody, rifleBarrel);
+    rifleGroup.position.set(0.15, 1.15, -0.4);
     group.add(rifleGroup);
 
     const leftArm = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.65, 8), suitMat);
