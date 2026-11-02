@@ -1,0 +1,9 @@
+version: '3.8'
+
+services:
+  omni-gaming-network:
+    build: .
+    container_name: omni_gaming_hub
+    ports:
+      - "8080:80"
+    restart: always
