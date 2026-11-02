@@ -455,7 +455,6 @@ function initCharacterPreview() {
 }
 
 function createHUDOverlays() {
-    // Mini-map on bottom-left (Hidden during lobby)
     const mapDiv = document.createElement('div');
     mapDiv.id = 'minimap-container';
     mapDiv.className = 'hidden';
@@ -479,7 +478,6 @@ function createHUDOverlays() {
     document.body.appendChild(mapDiv);
     miniMapCtx = miniMapCanvas.getContext('2d');
 
-    // Combat Stats HUD (Hidden during lobby)
     const hudInfo = document.createElement('div');
     hudInfo.id = 'combat-hud-stats';
     hudInfo.className = 'hidden';
@@ -501,7 +499,6 @@ function createHUDOverlays() {
     `;
     document.body.appendChild(hudInfo);
 
-    // Game Over Overlay (Hidden initially)
     const overlay = document.createElement('div');
     overlay.id = 'game-over-screen';
     overlay.className = 'hidden';
@@ -530,6 +527,7 @@ function createHUDOverlays() {
         reserveAmmo = 90;
         shieldEnergy = 0;
         isGameOver = false;
+        isGameStarted = true;
         document.getElementById('health-val').innerText = '100';
         document.getElementById('ammo-val').innerText = `${ammoInMag} / ${reserveAmmo} (M16)`;
         overlay.classList.add('hidden');
@@ -542,6 +540,10 @@ function setupLobbyUI() {
     if (deployBtn) {
         deployBtn.onclick = () => {
             isGameStarted = true;
+            isGameOver = false;
+            health = 100;
+            document.getElementById('health-val').innerText = '100';
+
             document.getElementById('lobby-menu').classList.add('hidden');
             document.getElementById('ui-overlay').classList.remove('hidden');
             document.getElementById('crosshair').classList.remove('hidden');
@@ -555,7 +557,6 @@ function setupLobbyUI() {
         };
     }
 
-    // Clean story card and settings gear button in lobby
     const lobbyMenu = document.getElementById('lobby-menu');
     if (lobbyMenu && !document.getElementById('story-card')) {
         const storyCard = document.createElement('div');
@@ -573,7 +574,6 @@ function setupLobbyUI() {
         const titleEl = lobbyMenu.querySelector('h1') || lobbyMenu.children[0];
         if (titleEl) titleEl.insertAdjacentElement('afterend', storyCard);
 
-        // Gear Button
         const gearBtn = document.createElement('button');
         gearBtn.innerHTML = '⚙️ Settings';
         gearBtn.style.position = 'absolute';
@@ -587,7 +587,6 @@ function setupLobbyUI() {
         gearBtn.style.cursor = 'pointer';
         gearBtn.style.zIndex = '1000';
 
-        // Settings Modal
         const settingsModal = document.createElement('div');
         settingsModal.id = 'settings-modal';
         settingsModal.className = 'hidden';
@@ -784,7 +783,7 @@ function animate() {
     const time = performance.now();
     const delta = (time - prevTime) / 1000;
 
-    // Paused completely while in Lobby Menu
+    // Completely frozen until user deploys from lobby
     if (isGameStarted && !isGameOver) {
         if (controls) controls.update(delta);
         updateCompassAndElevation();
