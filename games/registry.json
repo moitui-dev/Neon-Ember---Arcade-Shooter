@@ -1,0 +1,20 @@
+[
+  {
+    "id": "neon-ember",
+    "title": "Neon Ember - Arcade Shooter",
+    "author": "Omni Team",
+    "type": "internal",
+    "path": "games/neon-ember/index.html",
+    "category": "Single Player",
+    "thumbnail": "games/neon-ember/assets/thumb.png"
+  },
+  {
+    "id": "cyber-runner",
+    "title": "Cyber Runner",
+    "author": "DevGuru",
+    "type": "external",
+    "path": "https://cyber-runner-game.vercel.app",
+    "category": "1v1 Multiplayer",
+    "thumbnail": "https://cyber-runner-game.vercel.app/thumb.png"
+  }
+]
