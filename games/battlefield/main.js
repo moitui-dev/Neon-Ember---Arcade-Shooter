@@ -108,7 +108,7 @@ function initGame() {
     updateLightingAndSky();
 
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 1.6, 120); // Start way out in the sea for cinematic intro
+    camera.position.set(0, 1.6, 150);
 
     renderer = new THREE.WebGLRenderer({ antialias: graphicsQuality === 'high', powerPreference: "high-performance" });
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -356,12 +356,12 @@ function buildEnvironment(mapType) {
     environmentObjects.forEach(obj => scene.remove(obj));
     environmentObjects.length = 0;
 
-    // Ocean / Sea stretching out from the shore
-    const oceanGeo = new THREE.PlaneGeometry(500, 500);
-    const oceanMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.1, metalness: 0.8 });
+    // Properly positioned ocean stretching out from z = 30 to z = 400 with wave color
+    const oceanGeo = new THREE.PlaneGeometry(600, 400);
+    const oceanMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.2, metalness: 0.6 });
     const ocean = new THREE.Mesh(oceanGeo, oceanMat);
     ocean.rotation.x = -Math.PI / 2;
-    ocean.position.set(0, -0.2, 0);
+    ocean.position.set(0, 0.05, 200);
     scene.add(ocean);
     environmentObjects.push(ocean);
 
@@ -371,6 +371,7 @@ function buildEnvironment(mapType) {
         const floor = new THREE.Mesh(floorGeo, floorMat);
         floor.rotation.x = -Math.PI / 2;
         floor.receiveShadow = true;
+        floor.position.set(0, 0, -20);
         scene.add(floor);
         environmentObjects.push(floor);
 
@@ -378,7 +379,7 @@ function buildEnvironment(mapType) {
         for (let pos of [-50, 0, 50]) {
             const road = new THREE.Mesh(new THREE.PlaneGeometry(14, 360), tarmacMat);
             road.rotation.x = -Math.PI / 2;
-            road.position.set(pos, 0.01, 0);
+            road.position.set(pos, 0.02, -20);
             scene.add(road);
             environmentObjects.push(road);
         }
@@ -520,7 +521,7 @@ function createHUDOverlays() {
     overlay.innerHTML = `
         <h1 style="color: #ef4444; font-size: 3rem; font-family: sans-serif; letter-spacing: 2px; margin-bottom: 10px;">MISSION FAILED</h1>
         <p style="color: #cbd5e1; font-size: 1.2rem; margin-bottom: 30px;">You were eliminated in the tactical sector.</p>
-        <button id="redeploy-btn" style="background-color: #9333ea; color: white; border: none; padding: 14px 28px; font-size: 1.1rem; font-weight: bold; border-radius: 8px; cursor: pointer;">DEPLOY AGAIN</button>
+        <button id="redeploy-btn" style="background-color: #9333ea; color: white; border: none; padding: 14px 28px; font-size: 1.1rem; font-weight: bold; border-radius: 8px; cursor: pointer; pointer-events: auto;">DEPLOY AGAIN</button>
     `;
     document.body.appendChild(overlay);
 
@@ -531,8 +532,9 @@ function createHUDOverlays() {
         shieldEnergy = 0;
         isGameOver = false;
         isGameStarted = true;
-        isCinematicIntro = false;
-        camera.position.set(0, 1.6, 10);
+        isCinematicIntro = true;
+        introProgress = 0;
+        camera.position.set(0, 2.0, 150);
         document.getElementById('health-val').innerText = '100';
         document.getElementById('ammo-val').innerText = `${ammoInMag} / ${reserveAmmo} (M16)`;
         overlay.classList.add('hidden');
@@ -543,13 +545,14 @@ function createHUDOverlays() {
 function setupLobbyUI() {
     const deployBtn = document.getElementById('start-deployment-btn');
     if (deployBtn) {
+        deployBtn.style.pointerEvents = 'auto';
         deployBtn.onclick = () => {
             isGameStarted = true;
             isCinematicIntro = true;
             introProgress = 0;
             isGameOver = false;
             health = 100;
-            camera.position.set(0, 2.5, 120); // Start cinematic camera in the sea
+            camera.position.set(0, 2.0, 150); // Start cinematic camera out in the water
 
             document.getElementById('health-val').innerText = '100';
             document.getElementById('lobby-menu').classList.add('hidden');
@@ -560,94 +563,97 @@ function setupLobbyUI() {
             document.getElementById('minimap-container').classList.remove('hidden');
             document.getElementById('combat-hud-stats').classList.remove('hidden');
 
-            // Do not request pointer lock immediately until cinematic intro finishes
             initVoiceChat();
         };
     }
 
     const lobbyMenu = document.getElementById('lobby-menu');
-    if (lobbyMenu && !document.getElementById('story-card')) {
-        const storyCard = document.createElement('div');
-        storyCard.id = 'story-card';
-        storyCard.style.margin = '15px 0';
-        storyCard.style.padding = '12px 16px';
-        storyCard.style.backgroundColor = 'rgba(15, 23, 42, 0.7)';
-        storyCard.style.borderLeft = '3px solid #9333ea';
-        storyCard.style.borderRadius = '6px';
-        storyCard.style.color = '#cbd5e1';
-        storyCard.style.fontSize = '0.85rem';
-        storyCard.style.lineHeight = '1.4';
-        storyCard.innerHTML = `<strong style="color:#f8fafc;">Tactical Briefing:</strong> Infiltrate hostile coastal sectors from the sea. Swim ashore seamlessly, take your tactical position, eliminate enemy squads, and conquer the battlefield!`;
+    if (lobbyMenu) {
+        lobbyMenu.style.pointerEvents = 'auto';
+        if (!document.getElementById('story-card')) {
+            const storyCard = document.createElement('div');
+            storyCard.id = 'story-card';
+            storyCard.style.margin = '15px 0';
+            storyCard.style.padding = '12px 16px';
+            storyCard.style.backgroundColor = 'rgba(15, 23, 42, 0.7)';
+            storyCard.style.borderLeft = '3px solid #9333ea';
+            storyCard.style.borderRadius = '6px';
+            storyCard.style.color = '#cbd5e1';
+            storyCard.style.fontSize = '0.85rem';
+            storyCard.style.lineHeight = '1.4';
+            storyCard.innerHTML = `<strong style="color:#f8fafc;">Tactical Briefing:</strong> Infiltrate hostile coastal sectors from the sea. Swim ashore seamlessly, take your tactical position, eliminate enemy squads, and conquer the battlefield!`;
 
-        const titleEl = lobbyMenu.querySelector('h1') || lobbyMenu.children[0];
-        if (titleEl) titleEl.insertAdjacentElement('afterend', storyCard);
+            const titleEl = lobbyMenu.querySelector('h1') || lobbyMenu.children[0];
+            if (titleEl) titleEl.insertAdjacentElement('afterend', storyCard);
 
-        const gearBtn = document.createElement('button');
-        gearBtn.innerHTML = '⚙️ Settings';
-        gearBtn.style.position = 'absolute';
-        gearBtn.style.top = '20px';
-        gearBtn.style.right = '20px';
-        gearBtn.style.background = '#1e293b';
-        gearBtn.style.color = '#fff';
-        gearBtn.style.border = '1px solid #334155';
-        gearBtn.style.padding = '8px 14px';
-        gearBtn.style.borderRadius = '6px';
-        gearBtn.style.cursor = 'pointer';
-        gearBtn.style.zIndex = '1000';
+            const gearBtn = document.createElement('button');
+            gearBtn.innerHTML = '⚙️ Settings';
+            gearBtn.style.position = 'absolute';
+            gearBtn.style.top = '20px';
+            gearBtn.style.right = '20px';
+            gearBtn.style.background = '#1e293b';
+            gearBtn.style.color = '#fff';
+            gearBtn.style.border = '1px solid #334155';
+            gearBtn.style.padding = '8px 14px';
+            gearBtn.style.borderRadius = '6px';
+            gearBtn.style.cursor = 'pointer';
+            gearBtn.style.zIndex = '1000';
+            gearBtn.style.pointerEvents = 'auto';
 
-        const settingsModal = document.createElement('div');
-        settingsModal.id = 'settings-modal';
-        settingsModal.className = 'hidden';
-        settingsModal.style.position = 'fixed';
-        settingsModal.style.top = '0';
-        settingsModal.style.left = '0';
-        settingsModal.style.width = '100vw';
-        settingsModal.style.height = '100vh';
-        settingsModal.style.backgroundColor = 'rgba(10, 14, 26, 0.9)';
-        settingsModal.style.display = 'flex';
-        settingsModal.style.flexDirection = 'column';
-        settingsModal.style.justifyContent = 'center';
-        settingsModal.style.alignItems = 'center';
-        settingsModal.style.zIndex = '2000';
+            const settingsModal = document.createElement('div');
+            settingsModal.id = 'settings-modal';
+            settingsModal.className = 'hidden';
+            settingsModal.style.position = 'fixed';
+            settingsModal.style.top = '0';
+            settingsModal.style.left = '0';
+            settingsModal.style.width = '100vw';
+            settingsModal.style.height = '100vh';
+            settingsModal.style.backgroundColor = 'rgba(10, 14, 26, 0.9)';
+            settingsModal.style.display = 'flex';
+            settingsModal.style.flexDirection = 'column';
+            settingsModal.style.justifyContent = 'center';
+            settingsModal.style.alignItems = 'center';
+            settingsModal.style.zIndex = '2000';
 
-        settingsModal.innerHTML = `
-            <div style="background: #1e293b; padding: 30px; border-radius: 12px; border: 1px solid #334155; width: 350px;">
-                <h2 style="color: #f8fafc; margin-bottom: 20px;">Game Settings</h2>
-                <label style="color: #cbd5e1; display: block; margin-bottom: 8px;">Time of Day:</label>
-                <select id="setting-time" style="width: 100%; padding: 8px; margin-bottom: 15px; background: #0f172a; color: #fff; border-radius: 6px;">
-                    <option value="day">Day</option>
-                    <option value="night">Night</option>
-                    <option value="auto">Auto (System Time)</option>
-                </select>
+            settingsModal.innerHTML = `
+                <div style="background: #1e293b; padding: 30px; border-radius: 12px; border: 1px solid #334155; width: 350px;">
+                    <h2 style="color: #f8fafc; margin-bottom: 20px;">Game Settings</h2>
+                    <label style="color: #cbd5e1; display: block; margin-bottom: 8px;">Time of Day:</label>
+                    <select id="setting-time" style="width: 100%; padding: 8px; margin-bottom: 15px; background: #0f172a; color: #fff; border-radius: 6px;">
+                        <option value="day">Day</option>
+                        <option value="night">Night</option>
+                        <option value="auto">Auto (System Time)</option>
+                    </select>
 
-                <label style="color: #cbd5e1; display: block; margin-bottom: 8px;">Combat Sector:</label>
-                <select id="setting-map" style="width: 100%; padding: 8px; margin-bottom: 15px; background: #0f172a; color: #fff; border-radius: 6px;">
-                    <option value="city">City Ruins</option>
-                    <option value="forest">Green Forest & Hills</option>
-                    <option value="desert">Arid Desert</option>
-                </select>
+                    <label style="color: #cbd5e1; display: block; margin-bottom: 8px;">Combat Sector:</label>
+                    <select id="setting-map" style="width: 100%; padding: 8px; margin-bottom: 15px; background: #0f172a; color: #fff; border-radius: 6px;">
+                        <option value="city">City Ruins</option>
+                        <option value="forest">Green Forest & Hills</option>
+                        <option value="desert">Arid Desert</option>
+                    </select>
 
-                <label style="color: #cbd5e1; display: block; margin-bottom: 8px;">Graphics Quality:</label>
-                <select id="setting-gfx" style="width: 100%; padding: 8px; margin-bottom: 20px; background: #0f172a; color: #fff; border-radius: 6px;">
-                    <option value="high">High (Shadows & Antialias)</option>
-                    <option value="maxfps">Max FPS (Performance)</option>
-                </select>
+                    <label style="color: #cbd5e1; display: block; margin-bottom: 8px;">Graphics Quality:</label>
+                    <select id="setting-gfx" style="width: 100%; padding: 8px; margin-bottom: 20px; background: #0f172a; color: #fff; border-radius: 6px;">
+                        <option value="high">High (Shadows & Antialias)</option>
+                        <option value="maxfps">Max FPS (Performance)</option>
+                    </select>
 
-                <button id="close-settings" style="width: 100%; background: #9333ea; color: white; border: none; padding: 10px; font-weight: bold; border-radius: 6px; cursor: pointer;">Save & Close</button>
-            </div>
-        `;
-        document.body.appendChild(settingsModal);
-        document.body.appendChild(gearBtn);
+                    <button id="close-settings" style="width: 100%; background: #9333ea; color: white; border: none; padding: 10px; font-weight: bold; border-radius: 6px; cursor: pointer; pointer-events: auto;">Save & Close</button>
+                </div>
+            `;
+            document.body.appendChild(settingsModal);
+            document.body.appendChild(gearBtn);
 
-        gearBtn.onclick = () => settingsModal.classList.remove('hidden');
-        document.getElementById('close-settings').onclick = () => {
-            timeMode = document.getElementById('setting-time').value;
-            selectedMap = document.getElementById('setting-map').value;
-            graphicsQuality = document.getElementById('setting-gfx').value;
-            settingsModal.classList.add('hidden');
-            updateLightingAndSky();
-            buildEnvironment(selectedMap);
-        };
+            gearBtn.onclick = () => settingsModal.classList.remove('hidden');
+            document.getElementById('close-settings').onclick = () => {
+                timeMode = document.getElementById('setting-time').value;
+                selectedMap = document.getElementById('setting-map').value;
+                graphicsQuality = document.getElementById('setting-gfx').value;
+                settingsModal.classList.add('hidden');
+                updateLightingAndSky();
+                buildEnvironment(selectedMap);
+            };
+        }
     }
 }
 
@@ -800,12 +806,12 @@ function animate() {
     if (isGameStarted && !isGameOver) {
         // CINEMATIC SEA-SWIM INFILTRATION INTRO
         if (isCinematicIntro) {
-            introProgress += delta * 12; // Glide speed towards shore
-            camera.position.z = Math.max(10, 120 - introProgress);
-            // Gentle bobbing wave motion while swimming
-            camera.position.y = 1.6 + Math.sin(introProgress * 0.5) * 0.3;
+            introProgress += delta * 15; // Swim speed towards shore
+            camera.position.z = Math.max(0, 150 - introProgress);
+            // Gentle wave bobbing motion
+            camera.position.y = 1.6 + Math.sin(introProgress * 0.4) * 0.25;
 
-            if (camera.position.z <= 10) {
+            if (camera.position.z <= 0) {
                 isCinematicIntro = false;
                 document.body.requestPointerLock();
             }
