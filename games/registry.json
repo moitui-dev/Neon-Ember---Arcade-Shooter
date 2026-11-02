@@ -18,5 +18,15 @@
     "category": "1v1",
     "badge": "🛡️ 1v1 Battle",
     "description": "Tactical head-to-head grid combat hosted via external developer network."
+  },
+  {
+    "id": "battlefield",
+    "title": "3D Battlefield & Zombies",
+    "author": "Omni Team",
+    "type": "internal",
+    "path": "games/battlefield/index.html",
+    "category": "Single Player",
+    "badge": "🔥 3D Action",
+    "description": "Tactical first-person shooter featuring M16 ADS scopes, grenade physics, and cover maps."
   }
 ]
