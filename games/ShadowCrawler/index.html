@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shadow Crawler — Rogue-Lite Dungeon Crawler</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        slate: { 850: '#141418', 900: '#0e0e11', 950: '#070709' },
+                        neon: { red: '#ff2a6d', cyan: '#05d9e8', blue: '#005670', yellow: '#ffb800', purple: '#d300c5' }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Font Awesome Icons & Inter Font -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; user-select: none; }
+        canvas { touch-action: none; cursor: crosshair; }
+        .glass-panel { background: rgba(14, 14, 17, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between overflow-hidden">
+
+<!-- Top Navigation / Header -->
+<header class="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md z-20 px-4 py-3">
+    <div class="max-w-7xl mx-auto flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-rose-600 to-rose-950 flex items-center justify-center border border-rose-500/30 shadow-lg shadow-rose-900/40">
+                <i class="fa-solid fa-crosshairs text-rose-400 text-base"></i>
+            </div>
+            <div>
+                <h1 class="font-black text-base tracking-wider bg-gradient-to-r from-white via-slate-200 to-rose-400 bg-clip-text text-transparent">SHADOW CRAWLER</h1>
+                <p class="text-[10px] text-slate-400 font-medium tracking-wide">Dynamic Lighting Rogue-Lite</p>
+            </div>
+        </div>
+
+        <!-- Header Quick Stats -->
+        <div class="flex items-center space-x-6 text-xs font-semibold">
+            <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-skull text-rose-500"></i>
+                <span>Kills: <strong id="hudKills" class="text-white">0</strong></span>
+            </div>
+            <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-trophy text-amber-400"></i>
+                <span>Score: <strong id="hudScore" class="text-white">0</strong></span>
+            </div>
+            <button id="soundToggleBtn" onclick="toggleSound()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition flex items-center space-x-2 border border-slate-700/80 text-xs">
+                <i id="soundIcon" class="fa-solid fa-volume-high text-cyan-400"></i>
+                <span id="soundText">Sound On</span>
+            </button>
+        </div>
+    </div>
+</header>
+
+<!-- Main Game Area -->
+<main class="flex-grow flex items-center justify-center relative p-2 sm:p-4">
+    <!-- Canvas Frame Container -->
+    <div class="relative w-full max-w-[960px] aspect-[4/3] max-h-[80vh] rounded-2xl overflow-hidden border border-slate-800/80 shadow-2xl bg-slate-900 flex items-center justify-center">
+
+        <!-- Game Canvas -->
+        <canvas id="gameCanvas" class="w-full h-full block"></canvas>
+
+        <!-- Dynamic HUD Overlay Layer -->
+        <div id="hudOverlay" class="absolute inset-0 pointer-events-none p-4 flex flex-col justify-between transition-opacity duration-300">
+            <!-- Top HUD Bar: Health, Wave, Heat -->
+            <div class="flex items-start justify-between w-full">
+                <!-- Health & Level Info -->
+                <div class="space-y-2 max-w-[240px] w-full">
+                    <div class="flex items-center justify-between text-xs font-bold">
+                        <span class="text-rose-400 flex items-center gap-1.5"><i class="fa-solid fa-heart"></i> HULL VITALITY</span>
+                        <span id="hudHpText" class="text-slate-300">100 / 100</span>
+                    </div>
+                    <div class="w-full h-3 bg-slate-950/80 rounded-full border border-slate-800 overflow-hidden p-0.5">
+                        <div id="hudHpBar" class="h-full bg-gradient-to-r from-rose-600 to-rose-400 rounded-full transition-all duration-150" style="width: 100%;"></div>
+                    </div>
+
+                    <!-- XP / Level Progress -->
+                    <div class="flex items-center justify-between text-[11px] font-semibold pt-1">
+                        <span class="text-cyan-400 flex items-center gap-1.5"><i class="fa-solid fa-bolt"></i> LEVEL <span id="hudLevel">1</span></span>
+                        <span id="hudXpText" class="text-slate-400">0 / 50 XP</span>
+                    </div>
+                    <div class="w-full h-1.5 bg-slate-950/80 rounded-full border border-slate-800 overflow-hidden">
+                        <div id="hudXpBar" class="h-full bg-cyan-400 transition-all duration-150" style="width: 0%;"></div>
+                    </div>
+                </div>
+
+                <!-- Center Wave Display -->
+                <div class="glass-panel px-5 py-2.5 rounded-2xl text-center border border-slate-800/80 shadow-lg">
+                    <div class="text-[10px] uppercase font-bold tracking-widest text-slate-400">Threat Wave</div>
+                    <div id="hudWave" class="text-2xl font-black tracking-tight text-white">1</div>
+                </div>
+
+                <!-- Weapon Heat Gauge & Dash Status -->
+                <div class="space-y-2 max-w-[200px] w-full text-right">
+                    <div class="flex items-center justify-end text-xs font-bold space-x-1.5">
+                        <span id="hudHeatText" class="text-amber-400">CANNON TEMP</span>
+                        <i class="fa-solid fa-temperature-full text-amber-400"></i>
+                    </div>
+                    <div class="w-full h-3 bg-slate-950/80 rounded-full border border-slate-800 overflow-hidden p-0.5 ml-auto">
+                        <div id="hudHeatBar" class="h-full bg-gradient-to-r from-amber-500 to-rose-500 rounded-full transition-all duration-75" style="width: 0%;"></div>
+                    </div>
+                    <div id="overheatWarning" class="text-[10px] font-bold text-rose-500 uppercase tracking-wider hidden animate-pulse">OVERHEATED! COOLING...</div>
+
+                    <!-- Dash Cooldown Indicator -->
+                    <div class="flex items-center justify-end space-x-2 pt-1 text-xs font-semibold">
+                        <span class="text-slate-400 text-[10px]">SPACE DASH</span>
+                        <div id="hudDashIndicator" class="w-3 h-3 rounded-full bg-cyan-400 shadow-md shadow-cyan-500/50"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Tips Overlay -->
+            <div class="flex justify-between items-end text-[11px] text-slate-400 font-medium">
+                <div class="glass-panel px-3 py-1.5 rounded-xl border border-slate-800 flex items-center space-x-3">
+                    <span><kbd class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-200">WASD</kbd> Move</span>
+                    <span><kbd class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-200">MOUSE</kbd> Aim & Shoot</span>
+                    <span><kbd class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-200">SPACE</kbd> Dash</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Start / Game Over Screen Overlay -->
+        <div id="startScreen" class="absolute inset-0 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-6 space-y-6 text-center z-30">
+            <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-rose-600 to-rose-900 flex items-center justify-center text-white text-3xl shadow-xl shadow-rose-950/60 animate-pulse border border-rose-500/40">
+                <i class="fa-solid fa-ghost"></i>
+            </div>
+            <div class="space-y-2 max-w-md">
+                <h2 class="text-3xl font-black tracking-tight text-white">SHADOW CRAWLER</h2>
+                <p class="text-xs text-slate-400">Survive endless waves of hostile entities inside procedurally lit shadow caverns. Manage core weapon heat and execute invulnerable dashes.</p>
+            </div>
+            <button onclick="startGame()" class="px-8 py-3.5 rounded-xl bg-gradient-to-r from-rose-600 to-rose-800 hover:from-rose-500 hover:to-rose-700 text-white font-bold text-sm tracking-wide shadow-xl shadow-rose-950/50 border border-rose-500/30 transition transform active:scale-95 flex items-center space-x-2">
+                <i class="fa-solid fa-play"></i>
+                <span>ENTER SHADOWS</span>
+            </button>
+        </div>
+
+        <!-- Level Up Upgrade Choice Modal Overlay -->
+        <div id="upgradeModal" class="absolute inset-0 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-6 space-y-6 text-center z-40 hidden">
+            <div class="space-y-1">
+                <span class="text-xs font-bold text-cyan-400 tracking-widest uppercase">LEVEL UP DETECTED</span>
+                <h2 class="text-2xl font-black text-white">CHOOSE AN AUGMENTATION</h2>
+            </div>
+            <div id="upgradeOptions" class="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-2xl">
+                <!-- Dynamically populated upgrade cards -->
+            </div>
+        </div>
+
+        <!-- Game Over Screen Modal Overlay -->
+        <div id="gameOverModal" class="absolute inset-0 bg-slate-950/95 backdrop-blur-md flex flex-col items-center justify-center p-6 space-y-6 text-center z-40 hidden">
+            <div class="w-14 h-14 rounded-2xl bg-rose-950/80 border border-rose-700/50 flex items-center justify-center text-rose-500 text-2xl">
+                <i class="fa-solid fa-skull-crossbones"></i>
+            </div>
+            <div class="space-y-1">
+                <h2 class="text-3xl font-black text-white">SYSTEM DESTROYED</h2>
+                <p class="text-xs text-slate-400">Your hull succumbed to the darkness.</p>
+            </div>
+            <div class="glass-panel p-4 rounded-xl border border-slate-800 max-w-xs w-full space-y-2 text-xs font-medium">
+                <div class="flex justify-between"><span>Waves Survived:</span><strong id="finalWave" class="text-white">0</strong></div>
+                <div class="flex justify-between"><span>Entities Slain:</span><strong id="finalKills" class="text-white">0</strong></div>
+                <div class="flex justify-between"><span>Final Score:</span><strong id="finalScore" class="text-amber-400">0</strong></div>
+            </div>
+            <button onclick="startGame()" class="px-8 py-3.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm tracking-wide shadow-lg shadow-rose-900/50 transition transform active:scale-95 flex items-center space-x-2">
+                <i class="fa-solid fa-rotate-right"></i>
+                <span>REBOOT SYSTEM</span>
+            </button>
+        </div>
+    </div>
+</main>
+
+<!-- Footer -->
+<footer class="border-t border-slate-800/80 py-3 text-center text-[11px] text-slate-500">
+    <p>Shadow Crawler — Built with HTML5 Canvas 2D & Web Audio API</p>
+</footer>
+
+<!-- Game Logic Script -->
+<script>
+    // --- Sound Engine (Web Audio API) ---
+    let audioCtx = null;
+    let soundEnabled = true;
+
+    function initAudio() {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+    }
+
+    function playSound(type, freq, duration = 0.1, vol = 0.1) {
+        if (!soundEnabled) return;
+        try {
+            initAudio();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        } catch(e) {}
+    }
+
+    function toggleSound() {
+        soundEnabled = !soundEnabled;
+        const icon = document.getElementById('soundIcon');
+        const text = document.getElementById('soundText');
+        if (soundEnabled) {
+            icon.className = "fa-solid fa-volume-high text-cyan-400";
+            text.textContent = "Sound On";
+            playSound('sine', 600, 0.08, 0.1);
+        } else {
+            icon.className = "fa-solid fa-volume-xmark text-slate-500";
+            text.textContent = "Sound Off";
+        }
+    }
+
+    // --- Game Setup & Canvas Context ---
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const VIEW_WIDTH = 960;
+    const VIEW_HEIGHT = 720;
+    canvas.width = VIEW_WIDTH;
+    canvas.height = VIEW_HEIGHT;
+
+    // Input Tracking
+    const keys = { w: false, a: false, s: false, d: false, space: false };
+    const mouse = { x: 0, y: 0, down: false };
+
+    window.addEventListener('keydown', e => {
+        if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp') keys.w = true;
+        if (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') keys.a = true;
+        if (e.key === 's' || e.key === 'S' || e.key === 'ArrowDown') keys.s = true;
+        if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') keys.d = true;
+        if (e.code === 'Space') {
+            if (!keys.space) triggerDash();
+            keys.space = true;
+        }
+    });
+
+    window.addEventListener('keyup', e => {
+        if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp') keys.w = false;
+        if (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') keys.a = false;
+        if (e.key === 's' || e.key === 'S' || e.key === 'ArrowDown') keys.s = false;
+        if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') keys.d = false;
+        if (e.code === 'Space') keys.space = false;
+    });
+
+    canvas.addEventListener('mousemove', e => {
+        const rect = canvas.getBoundingClientRect();
+        mouse.x = (e.clientX - rect.left) * (VIEW_WIDTH / rect.width);
+        mouse.y = (e.clientY - rect.top) * (VIEW_HEIGHT / rect.height);
+    });
+
+    canvas.addEventListener('mousedown', () => mouse.down = true);
+    window.addEventListener('mouseup', () => mouse.down = false);
+
+    // --- Map & Walls Definition ---
+    const MAP_SIZE = 1200;
+    const walls = [
+        // Outer Borders
+        { x: 0, y: 0, w: MAP_SIZE, h: 20 },
+        { x: 0, y: MAP_SIZE - 20, w: MAP_SIZE, h: 20 },
+        { x: 0, y: 0, w: 20, h: MAP_SIZE },
+        { x: MAP_SIZE - 20, y: 0, w: 20, h: MAP_SIZE },
+
+        // Interior Pillars & Obstacles
+        { x: 250, y: 200, w: 120, h: 120 },
+        { x: 800, y: 250, w: 140, h: 100 },
+        { x: 450, y: 500, w: 200, h: 80 },
+        { x: 200, y: 750, w: 100, h: 220 },
+        { x: 750, y: 750, w: 180, h: 140 }
+    ];
+
+    // --- Game State Variables ---
+    let isPlaying = false;
+    let isPaused = false;
+    let score = 0;
+    let kills = 0;
+    let wave = 1;
+    let camera = { x: 0, y: 0 };
+    let screenShake = 0;
+
+    // Player Attributes & Upgrades
+    let player = {
+        x: 600, y: 600, radius: 14,
+        speed: 3.2,
+        hp: 100, maxHp: 100,
+        xp: 0, nextXp: 40, level: 1,
+        heat: 0, maxHeat: 100, overheated: false,
+        dashCooldown: 0, maxDashCooldown: 90, dashDuration: 0,
+        angle: 0
+    };
+
+    let upgrades = {
+        splitShot: 0,   // extra side bullets
+        ricochet: 0,    // bullets bounce off walls
+        piercing: 0,    // bullets pierce enemies
+        fireRate: 0,    // lower shot delay
+        cooling: 0      // faster heat reduction
+    };
+
+    let shootTimer = 0;
+    let bullets = [];
+    let enemyBullets = [];
+    let enemies = [];
+    let particles = [];
+    let xpGems = [];
+
+    // --- Upgrade Database ---
+    const UPGRADE_POOL = [
+        { id: 'splitShot', name: 'Twin Splitter', desc: 'Fires +1 additional angled projectile per shot.', icon: 'fa-arrows-split-up-and-left', color: 'text-rose-400' },
+        { id: 'ricochet', name: 'Bounce Modules', desc: 'Projectiles ricochet off wall surfaces 1 extra time.', icon: 'fa-reply-all', color: 'text-cyan-400' },
+        { id: 'piercing', name: 'Phase Beams', desc: 'Projectiles slice through +1 enemy before breaking.', icon: 'fa-bolt', color: 'text-amber-400' },
+        { id: 'fireRate', name: 'Overdrive Trigger', desc: 'Increases cannon fire rate by 20%.', icon: 'fa-gauge-high', color: 'text-emerald-400' },
+        { id: 'cooling', name: 'Heat Dissipator', desc: 'Weapon cools down 30% faster after firing.', icon: 'fa-snowflake', color: 'text-purple-400' }
+    ];
+
+    // --- Game Initialization ---
+    function startGame() {
+        player.x = 600;
+        player.y = 600;
+        player.hp = 100;
+        player.maxHp = 100;
+        player.xp = 0;
+        player.nextXp = 40;
+        player.level = 1;
+        player.heat = 0;
+        player.overheated = false;
+
+        score = 0;
+        kills = 0;
+        wave = 1;
+
+        upgrades = { splitShot: 0, ricochet: 0, piercing: 0, fireRate: 0, cooling: 0 };
+        bullets = [];
+        enemyBullets = [];
+        enemies = [];
+        particles = [];
+        xpGems = [];
+
+        document.getElementById('startScreen').classList.add('hidden');
+        document.getElementById('gameOverModal').classList.add('hidden');
+        document.getElementById('upgradeModal').classList.add('hidden');
+
+        isPlaying = true;
+        isPaused = false;
+        updateHudUI();
+        spawnWave();
+        playSound('sine', 440, 0.2, 0.15);
+    }
+
+    // --- Wave Spawning Engine ---
+    function spawnWave() {
+        const enemyCount = 4 + wave * 3;
+        for (let i = 0; i < enemyCount; i++) {
+            // Find valid spawn point away from player
+            let sx, sy, valid = false;
+            while (!valid) {
+                sx = Math.random() * (MAP_SIZE - 100) + 50;
+                sy = Math.random() * (MAP_SIZE - 100) + 50;
+                const dist = Math.hypot(sx - player.x, sy - player.y);
+                if (dist > 280 && !checkWallCollision(sx, sy, 20)) {
+                    valid = true;
+                }
+            }
+
+            // Determine enemy type
+            const rand = Math.random();
+            let type = 'chaser';
+            if (rand > 0.65 && wave >= 2) type = 'shooter';
+            if (rand > 0.85 && wave >= 3) type = 'tank';
+
+            if (type === 'chaser') {
+                enemies.push({ x: sx, y: sy, type, radius: 12, hp: 25 + wave * 5, maxHp: 25 + wave * 5, speed: 2.2 + Math.random() * 0.4, color: '#ff2a6d' });
+            } else if (type === 'shooter') {
+                enemies.push({ x: sx, y: sy, type, radius: 14, hp: 35 + wave * 5, maxHp: 35 + wave * 5, speed: 1.5, shootTimer: 0, color: '#05d9e8' });
+            } else if (type === 'tank') {
+                enemies.push({ x: sx, y: sy, type, radius: 22, hp: 110 + wave * 25, maxHp: 110 + wave * 25, speed: 1.0, color: '#ffb800' });
+            }
+        }
+        updateHudUI();
+    }
+
+    // --- Dash Mechanic Trigger ---
+    function triggerDash() {
+        if (!isPlaying || isPaused || player.dashCooldown > 0) return;
+        player.dashCooldown = player.maxDashCooldown;
+        player.dashDuration = 12; // Frames of dash invulnerability & speed boost
+        playSound('sawtooth', 350, 0.12, 0.15);
+
+        // Dash Ghost Particles
+        for (let i = 0; i < 8; i++) {
+            particles.push({
+                x: player.x, y: player.y,
+                vx: (Math.random() - 0.5) * 2, vy: (Math.random() - 0.5) * 2,
+                life: 15, maxLife: 15, radius: player.radius, color: 'rgba(5, 217, 232, 0.6)'
+            });
+        }
+    }
+
+    // --- Collision Utilities ---
+    function checkWallCollision(x, y, r) {
+        for (let w of walls) {
+            if (x + r > w.x && x - r < w.x + w.w && y + r > w.y && y - r < w.y + w.h) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // --- Player Shooting Logic ---
+    function firePlayerCannon() {
+        if (player.overheated || shootTimer > 0) return;
+
+        const baseDelay = Math.max(6, 14 - upgrades.fireRate * 2);
+        shootTimer = baseDelay;
+
+        // Heat Generation
+        player.heat += 7;
+        if (player.heat >= player.maxHeat) {
+            player.heat = player.maxHeat;
+            player.overheated = true;
+            playSound('sawtooth', 150, 0.4, 0.2);
+        } else {
+            playSound('sine', 800 + Math.random() * 100, 0.05, 0.08);
+        }
+
+        // Bullet Spawning
+        const baseAngle = player.angle;
+        const extraShots = upgrades.splitShot;
+        const totalShots = 1 + extraShots;
+        const spread = 0.18;
+
+        for (let i = 0; i < totalShots; i++) {
+            const angleOffset = (i - (totalShots - 1) / 2) * spread;
+            const finalAngle = baseAngle + angleOffset;
+
+            bullets.push({
+                x: player.x + Math.cos(finalAngle) * 16,
+                y: player.y + Math.sin(finalAngle) * 16,
+                vx: Math.cos(finalAngle) * 9.5,
+                vy: Math.sin(finalAngle) * 9.5,
+                radius: 4,
+                pierce: upgrades.piercing,
+                ricochet: upgrades.ricochet,
+                life: 90,
+                color: '#05d9e8'
+            });
+        }
+
+        // Recoil & Screen Shake
+        screenShake = Math.max(screenShake, 2.5);
+    }
+
+    // --- Level Up & Upgrade Options ---
+    function triggerLevelUp() {
+        isPaused = true;
+        player.level++;
+        player.xp -= player.nextXp;
+        player.nextXp = Math.floor(player.nextXp * 1.4);
+        playSound('triangle', 523, 0.25, 0.2);
+
+        const modal = document.getElementById('upgradeModal');
+        const container = document.getElementById('upgradeOptions');
+        container.innerHTML = '';
+
+        // Pick 3 random upgrade choices
+        const shuffled = [...UPGRADE_POOL].sort(() => 0.5 - Math.random()).slice(0, 3);
+        shuffled.forEach(opt => {
+            const card = document.createElement('div');
+            card.className = "glass-panel p-4 rounded-2xl border border-slate-800 hover:border-cyan-500/50 cursor-pointer transition flex flex-col items-center justify-between text-center space-y-3 hover:scale-105 active:scale-95";
+            card.innerHTML = `
+                    <div class="w-12 h-12 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center text-xl ${opt.color}">
+                        <i class="fa-solid ${opt.icon}"></i>
+                    </div>
+                    <div class="space-y-1">
+                        <h3 class="font-bold text-sm text-white">${opt.name}</h3>
+                        <p class="text-[11px] text-slate-400 leading-tight">${opt.desc}</p>
+                    </div>
+                    <span class="text-[10px] font-semibold px-2.5 py-1 rounded-full bg-slate-800 text-cyan-300">SELECT</span>
+                `;
+            card.onclick = () => selectUpgrade(opt.id);
+            container.appendChild(card);
+        });
+
+        modal.classList.remove('hidden');
+    }
+
+    function selectUpgrade(id) {
+        upgrades[id]++;
+        document.getElementById('upgradeModal').classList.add('hidden');
+        isPaused = false;
+        updateHudUI();
+        playSound('sine', 700, 0.1, 0.15);
+    }
+
+    // --- Main Game Update Loop ---
+    function update() {
+        if (!isPlaying || isPaused) return;
+
+        // 1. Player Movement & WASD Physics
+        let moveX = 0, moveY = 0;
+        if (keys.w) moveY -= 1;
+        if (keys.s) moveY += 1;
+        if (keys.a) moveX -= 1;
+        if (keys.d) moveX += 1;
+
+        if (moveX !== 0 && moveY !== 0) {
+            moveX *= 0.7071;
+            moveY *= 0.7071;
+        }
+
+        let currentSpeed = player.speed;
+        if (player.dashDuration > 0) {
+            currentSpeed *= 2.6;
+            player.dashDuration--;
+        }
+
+        const nextX = player.x + moveX * currentSpeed;
+        const nextY = player.y + moveY * currentSpeed;
+
+        if (!checkWallCollision(nextX, player.y, player.radius)) player.x = nextX;
+        if (!checkWallCollision(player.x, nextY, player.radius)) player.y = nextY;
+
+        // Aim Direction
+        const worldMouseX = mouse.x + camera.x;
+        const worldMouseY = mouse.y + camera.y;
+        player.angle = Math.atan2(worldMouseY - player.y, worldMouseX - player.x);
+
+        // Dash Cooldown Logic
+        if (player.dashCooldown > 0) player.dashCooldown--;
+
+        // Weapon Timers & Cooling
+        if (shootTimer > 0) shootTimer--;
+
+        const coolSpeed = 0.45 + upgrades.cooling * 0.2;
+        if (player.heat > 0) {
+            player.heat -= coolSpeed;
+            if (player.heat <= 0) {
+                player.heat = 0;
+                player.overheated = false;
+            }
+        }
+
+        if (mouse.down) firePlayerCannon();
+
+        // 2. Camera Tracking Smooth Follow
+        camera.x += (player.x - VIEW_WIDTH / 2 - camera.x) * 0.1;
+        camera.y += (player.y - VIEW_HEIGHT / 2 - camera.y) * 0.1;
+        camera.x = Math.max(0, Math.min(MAP_SIZE - VIEW_WIDTH, camera.x));
+        camera.y = Math.max(0, Math.min(MAP_SIZE - VIEW_HEIGHT, camera.y));
+
+        // 3. Player Bullets Update
+        for (let i = bullets.length - 1; i >= 0; i--) {
+            const b = bullets[i];
+            b.x += b.vx;
+            b.y += b.vy;
+            b.life--;
+
+            // Wall Collisions & Ricochet
+            if (checkWallCollision(b.x, b.y, b.radius)) {
+                if (b.ricochet > 0) {
+                    b.ricochet--;
+                    b.vx = -b.vx * 0.9;
+                    b.vy = -b.vy * 0.9;
+                    playSound('sine', 300, 0.04, 0.05);
+                } else {
+                    bullets.splice(i, 1);
+                    createSparkParticles(b.x, b.y, '#05d9e8');
+                    continue;
+                }
+            }
+
+            // Enemy Collisions
+            for (let j = enemies.length - 1; j >= 0; j--) {
+                const e = enemies[j];
+                const dist = Math.hypot(b.x - e.x, b.y - e.y);
+                if (dist < b.radius + e.radius) {
+                    e.hp -= 20;
+                    createSparkParticles(b.x, b.y, '#ff2a6d');
+                    playSound('triangle', 200 + Math.random() * 100, 0.05, 0.08);
+
+                    // Enemy Death Handling
+                    if (e.hp <= 0) {
+                        enemies.splice(j, 1);
+                        kills++;
+                        score += e.type === 'tank' ? 150 : (e.type === 'shooter' ? 80 : 40);
+                        xpGems.push({ x: e.x, y: e.y, val: e.type === 'tank' ? 30 : 15 });
+                        createSparkParticles(e.x, e.y, e.color, 12);
+                        screenShake = Math.max(screenShake, 4);
+                    }
+
+                    if (b.pierce > 0) {
+                        b.pierce--;
+                    } else {
+                        bullets.splice(i, 1);
+                        break;
+                    }
+                }
+            }
+
+            if (b.life <= 0 && bullets[i]) bullets.splice(i, 1);
+        }
+
+        // 4. Enemy AI & Projectiles
+        enemies.forEach(e => {
+            const angle = Math.atan2(player.y - e.y, player.x - e.x);
+            const distToPlayer = Math.hypot(player.x - e.x, player.y - e.y);
+
+            if (e.type === 'chaser' || e.type === 'tank') {
+                const vx = Math.cos(angle) * e.speed;
+                const vy = Math.sin(angle) * e.speed;
+                if (!checkWallCollision(e.x + vx, e.y, e.radius)) e.x += vx;
+                if (!checkWallCollision(e.x, e.y + vy, e.radius)) e.y += vy;
+            } else if (e.type === 'shooter') {
+                // Maintain distance
+                if (distToPlayer < 220) {
+                    const vx = -Math.cos(angle) * e.speed;
+                    const vy = -Math.sin(angle) * e.speed;
+                    if (!checkWallCollision(e.x + vx, e.y, e.radius)) e.x += vx;
+                    if (!checkWallCollision(e.x, e.y + vy, e.radius)) e.y += vy;
+                } else if (distToPlayer > 300) {
+                    const vx = Math.cos(angle) * e.speed;
+                    const vy = Math.sin(angle) * e.speed;
+                    if (!checkWallCollision(e.x + vx, e.y, e.radius)) e.x += vx;
+                    if (!checkWallCollision(e.x, e.y + vy, e.radius)) e.y += vy;
+                }
+
+                // Shoot logic
+                e.shootTimer = (e.shootTimer || 0) + 1;
+                if (e.shootTimer > 90) {
+                    e.shootTimer = 0;
+                    enemyBullets.push({
+                        x: e.x, y: e.y,
+                        vx: Math.cos(angle) * 5, vy: Math.sin(angle) * 5,
+                        radius: 5, color: '#ff2a6d'
+                    });
+                }
+            }
+
+            // Melee damage to player (if not dashing)
+            if (distToPlayer < player.radius + e.radius && player.dashDuration <= 0) {
+                player.hp -= 0.6;
+                screenShake = Math.max(screenShake, 3);
+                if (player.hp <= 0) triggerGameOver();
+            }
+        });
+
+        // 5. Enemy Bullets Update
+        for (let i = enemyBullets.length - 1; i >= 0; i--) {
+            const eb = enemyBullets[i];
+            eb.x += eb.vx;
+            eb.y += eb.vy;
+
+            if (checkWallCollision(eb.x, eb.y, eb.radius)) {
+                enemyBullets.splice(i, 1);
+                continue;
+            }
+
+            const dist = Math.hypot(eb.x - player.x, eb.y - player.y);
+            if (dist < eb.radius + player.radius) {
+                if (player.dashDuration <= 0) {
+                    player.hp -= 12;
+                    screenShake = Math.max(screenShake, 5);
+                    playSound('sawtooth', 120, 0.15, 0.2);
+                    if (player.hp <= 0) triggerGameOver();
+                }
+                enemyBullets.splice(i, 1);
+            }
+        }
+
+        // 6. XP Gems Collection
+        for (let i = xpGems.length - 1; i >= 0; i--) {
+            const gem = xpGems[i];
+            const dist = Math.hypot(player.x - gem.x, player.y - gem.y);
+            if (dist < 140) {
+                // Magnet attraction
+                gem.x += (player.x - gem.x) * 0.12;
+                gem.y += (player.y - gem.y) * 0.12;
+            }
+            if (dist < player.radius + 8) {
+                player.xp += gem.val;
+                playSound('sine', 900, 0.05, 0.08);
+                xpGems.splice(i, 1);
+                if (player.xp >= player.nextXp) triggerLevelUp();
+            }
+        }
+
+        // Check next wave spawn
+        if (enemies.length === 0) {
+            wave++;
+            spawnWave();
+            playSound('triangle', 600, 0.2, 0.15);
+        }
+
+        // Particles Update
+        for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.life--;
+            if (p.life <= 0) particles.splice(i, 1);
+        }
+
+        if (screenShake > 0) screenShake *= 0.88;
+        updateHudUI();
+    }
+
+    function createSparkParticles(x, y, color, count = 5) {
+        for (let i = 0; i < count; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = Math.random() * 3 + 1;
+            particles.push({
+                x, y,
+                vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+                life: 12 + Math.random() * 8, maxLife: 20, radius: 2.5, color
+            });
+        }
+    }
+
+    function triggerGameOver() {
+        isPlaying = false;
+        document.getElementById('finalWave').textContent = wave;
+        document.getElementById('finalKills').textContent = kills;
+        document.getElementById('finalScore').textContent = score;
+        document.getElementById('gameOverModal').classList.remove('hidden');
+        playSound('sawtooth', 90, 0.6, 0.25);
+    }
+
+    // --- Raycasting Dynamic Lighting & Shadow Engine ---
+    function renderLightingAndFog() {
+        // Offscreen Raycasting Shadow Canvas overlay
+        const shadowCanvas = document.createElement('canvas');
+        shadowCanvas.width = VIEW_WIDTH;
+        shadowCanvas.height = VIEW_HEIGHT;
+        const sCtx = shadowCanvas.getContext('2d');
+
+        sCtx.fillStyle = 'rgba(7, 7, 9, 0.94)';
+        sCtx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+
+        const px = player.x - camera.x;
+        const py = player.y - camera.y;
+
+        // Visibility cone & raycasting points around walls
+        const rayPoints = [];
+        walls.forEach(w => {
+            const wx = w.x - camera.x;
+            const wy = w.y - camera.y;
+            [
+                { x: wx, y: wy }, { x: wx + w.w, y: wy },
+                { x: wx + w.w, y: wy + w.h }, { x: wx, y: wy + w.h }
+            ].forEach(pt => {
+                const angle = Math.atan2(pt.y - py, pt.x - px);
+                rayPoints.push(angle - 0.0001, angle, angle + 0.0001);
+            });
+        });
+
+        // Standard radial angles for ambient light fill
+        for (let a = 0; a < Math.PI * 2; a += Math.PI / 16) {
+            rayPoints.push(a);
+        }
+
+        rayPoints.sort((a, b) => a - b);
+
+        // Raycast intersection checks
+        const lightPoly = [];
+        rayPoints.forEach(angle => {
+            const dx = Math.cos(angle);
+            const dy = Math.sin(angle);
+            let closestDist = 380; // Max torch radius
+
+            walls.forEach(w => {
+                const wx = w.x - camera.x;
+                const wy = w.y - camera.y;
+
+                // Ray-rectangle intersection segments
+                const segments = [
+                    { x1: wx, y1: wy, x2: wx + w.w, y2: wy },
+                    { x1: wx + w.w, y1: wy, x2: wx + w.w, y2: wy + w.h },
+                    { x1: wx + w.w, y1: wy + w.h, x2: wx, y2: wy + w.h },
+                    { x1: wx, y1: wy + w.h, x2: wx, y2: wy }
+                ];
+
+                segments.forEach(seg => {
+                    const hit = raySegmentIntersect(px, py, px + dx * closestDist, py + dy * closestDist, seg.x1, seg.y1, seg.x2, seg.y2);
+                    if (hit && hit.dist < closestDist) {
+                        closestDist = hit.dist;
+                    }
+                });
+            });
+
+            lightPoly.push({ x: px + dx * closestDist, y: py + dy * closestDist });
+        });
+
+        // Punch out light mask from darkness layer
+        sCtx.globalCompositeOperation = 'destination-out';
+        const lightGrad = sCtx.createRadialGradient(px, py, 10, px, py, 380);
+        lightGrad.addColorStop(0, 'rgba(0,0,0,1)');
+        lightGrad.addColorStop(0.7, 'rgba(0,0,0,0.85)');
+        lightGrad.addColorStop(1, 'rgba(0,0,0,0)');
+
+        sCtx.fillStyle = lightGrad;
+        sCtx.beginPath();
+        if (lightPoly.length > 0) {
+            sCtx.moveTo(lightPoly[0].x, lightPoly[0].y);
+            for (let i = 1; i < lightPoly.length; i++) sCtx.lineTo(lightPoly[i].x, lightPoly[i].y);
+        }
+        sCtx.closePath();
+        sCtx.fill();
+
+        ctx.drawImage(shadowCanvas, 0, 0);
+    }
+
+    function raySegmentIntersect(x1, y1, x2, y2, x3, y3, x4, y4) {
+        const denom = (y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1);
+        if (denom === 0) return null;
+        const ua = ((x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)) / denom;
+        const ub = ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)) / denom;
+        if (ua >= 0 && ua <= 1 && ub >= 0 && ub <= 1) {
+            return { x: x1 + ua * (x2 - x1), y: y1 + ua * (y2 - y1), dist: ua * Math.hypot(x2 - x1, y2 - y1) };
+        }
+        return null;
+    }
+
+    // --- Render Main Frame ---
+    function render() {
+        ctx.clearRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+
+        ctx.save();
+        // Apply Screen Shake transform
+        if (screenShake > 0.5) {
+            const rx = (Math.random() - 0.5) * screenShake;
+            const ry = (Math.random() - 0.5) * screenShake;
+            ctx.translate(rx, ry);
+        }
+
+        // 1. Draw Grid Floor Background
+        ctx.fillStyle = '#0e0e11';
+        ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+
+        ctx.strokeStyle = '#181820';
+        ctx.lineWidth = 1;
+        const gridOffsetCols = (camera.x % 40);
+        const gridOffsetRows = (camera.y % 40);
+        for (let x = -gridOffsetCols; x < VIEW_WIDTH; x += 40) {
+            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, VIEW_HEIGHT); ctx.stroke();
+        }
+        for (let y = -gridOffsetRows; y < VIEW_HEIGHT; y += 40) {
+            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(VIEW_WIDTH, y); ctx.stroke();
+        }
+
+        // 2. Draw Walls & Obstacles
+        walls.forEach(w => {
+            const wx = w.x - camera.x;
+            const wy = w.y - camera.y;
+
+            if (wx + w.w < 0 || wx > VIEW_WIDTH || wy + w.h < 0 || wy > VIEW_HEIGHT) return;
+
+            ctx.fillStyle = '#1e1e26';
+            ctx.strokeStyle = '#323240';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.roundRect(wx, wy, w.w, w.h, 6);
+            ctx.fill();
+            ctx.stroke();
+        });
+
+        // 3. Draw XP Gems
+        xpGems.forEach(g => {
+            const gx = g.x - camera.x;
+            const gy = g.y - camera.y;
+            ctx.save();
+            ctx.fillStyle = '#05d9e8';
+            ctx.shadowColor = '#05d9e8';
+            ctx.shadowBlur = 8;
+            ctx.beginPath();
+            ctx.arc(gx, gy, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        });
+
+        // 4. Draw Player
+        const px = player.x - camera.x;
+        const py = player.y - camera.y;
+
+        ctx.save();
+        ctx.translate(px, py);
+        ctx.rotate(player.angle);
+
+        // Barrel / Cannon
+        ctx.fillStyle = player.overheated ? '#ff2a6d' : '#05d9e8';
+        ctx.fillRect(4, -3, 14, 6);
+
+        // Body Hull
+        ctx.fillStyle = '#ffffff';
+        ctx.shadowColor = player.dashDuration > 0 ? '#05d9e8' : '#ff2a6d';
+        ctx.shadowBlur = 12;
+        ctx.beginPath();
+        ctx.arc(0, 0, player.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // 5. Draw Enemies
+        enemies.forEach(e => {
+            const ex = e.x - camera.x;
+            const ey = e.y - camera.y;
+
+            ctx.save();
+            ctx.fillStyle = e.color;
+            ctx.shadowColor = e.color;
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.arc(ex, ey, e.radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Health Bar over Heavy Tanks
+            if (e.type === 'tank') {
+                ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                ctx.fillRect(ex - 16, ey - e.radius - 8, 32, 4);
+                ctx.fillStyle = '#ff2a6d';
+                ctx.fillRect(ex - 16, ey - e.radius - 8, (e.hp / e.maxHp) * 32, 4);
+            }
+            ctx.restore();
+        });
+
+        // 6. Draw Bullets & Projectiles
+        bullets.forEach(b => {
+            ctx.save();
+            ctx.fillStyle = b.color;
+            ctx.shadowColor = b.color;
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.arc(b.x - camera.x, b.y - camera.y, b.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        });
+
+        enemyBullets.forEach(eb => {
+            ctx.save();
+            ctx.fillStyle = eb.color;
+            ctx.shadowColor = eb.color;
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.arc(eb.x - camera.x, eb.y - camera.y, eb.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        });
+
+        // 7. Draw Particles
+        particles.forEach(p => {
+            ctx.save();
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(p.x - camera.x, p.y - camera.y, p.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        });
+
+        ctx.restore();
+
+        // 8. Render Dynamic Lighting & Shadows
+        renderLightingAndFog();
+    }
+
+    // --- HUD UI Sync ---
+    function updateHudUI() {
+        document.getElementById('hudKills').textContent = kills;
+        document.getElementById('hudScore').textContent = score;
+        document.getElementById('hudWave').textContent = wave;
+        document.getElementById('hudLevel').textContent = player.level;
+
+        // Health Bar
+        const hpPercent = Math.max(0, (player.hp / player.maxHp) * 100);
+        document.getElementById('hudHpBar').style.width = `${hpPercent}%`;
+        document.getElementById('hudHpText').textContent = `${Math.ceil(player.hp)} / ${player.maxHp}`;
+
+        // XP Bar
+        const xpPercent = Math.min(100, (player.xp / player.nextXp) * 100);
+        document.getElementById('hudXpBar').style.width = `${xpPercent}%`;
+        document.getElementById('hudXpText').textContent = `${player.xp} / ${player.nextXp} XP`;
+
+        // Weapon Heat Gauge
+        const heatPercent = Math.min(100, (player.heat / player.maxHeat) * 100);
+        const heatBar = document.getElementById('hudHeatBar');
+        heatBar.style.width = `${heatPercent}%`;
+
+        const warn = document.getElementById('overheatWarning');
+        if (player.overheated) {
+            warn.classList.remove('hidden');
+        } else {
+            warn.classList.add('hidden');
+        }
+
+        // Dash Indicator
+        const dashDot = document.getElementById('hudDashIndicator');
+        if (player.dashCooldown <= 0) {
+            dashDot.className = "w-3 h-3 rounded-full bg-cyan-400 shadow-md shadow-cyan-500/50";
+        } else {
+            dashDot.className = "w-3 h-3 rounded-full bg-slate-700";
+        }
+    }
+
+    // --- Main Animation Loop ---
+    function loop() {
+        update();
+        render();
+        requestAnimationFrame(loop);
+    }
+
+    // Run on load
+    window.onload = function() {
+        requestAnimationFrame(loop);
+    };
+</script>
+</body>
+</html>

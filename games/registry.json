@@ -27,5 +27,15 @@
     "badge": "NEW",
     "description": "High-fidelity tactical FPS set in a dynamic night-themed city ruins map.",
     "path": "games/battlefield/index.html"
+  },
+  {
+    "id": "shadow-crawler",
+    "title": "Shadow Crawler",
+    "author": "Development Team",
+    "type": "internal",
+    "path": "games/shadow-crawler/index.html",
+    "category": "Single Player",
+    "badge": "⚡ Rogue-Lite",
+    "description": "Top-down rogue-lite shooter featuring dynamic raycasting light and shadows, weapon heat management, wave progression, and passive upgrades."
   }
 ]
